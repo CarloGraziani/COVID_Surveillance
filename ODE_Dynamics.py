@@ -19,6 +19,11 @@ class ODE_model(object):
 
       params (`Tensor`[...,:]): Model parameters. Leftmost indices denote
         chains.
+
+    Note that if a subclass is intended to represent an epidemiological
+    model, it should overwrite the 'infection_rate' method, which returns
+    the infection rate -- not counting recoveries and fatalities -- for
+    the current state.
     """
 
     Ndim = 0  # Each derived class needs to set this as appropriate
@@ -39,6 +44,16 @@ class ODE_model(object):
         """
         return 0
 
+
+#######################################################################
+    def infection_rate(self, state):
+        """
+        Should return the current infection rate, not counting recoveries
+        and fatalities.  Calling the base-class version of this method is
+        a NotImplementedError.
+        """
+
+        raise NotImplementedError("Method 'infection_rate' undefined.")
 
 #######################################################################
 #######################################################################
@@ -68,7 +83,7 @@ class SIR(ODE_model):
         Args:
 
           state (`Tensor`[...,2]): State vector.  Leftmost indices denote
-        chains.
+          chains.
             state[...,0]: Infected fraction
             state[...,1]: Susceptible fraction
         """
@@ -82,3 +97,25 @@ class SIR(ODE_model):
         ret1 = mu - (nu+mu)*R0*i*s - mu*s
         ret = tf.stack((ret0, ret1), axis=-1)
         return ret
+
+#######################################################################
+        def infection_rate(self, state):
+            """
+            Return infection rate, not counting recoveries and fatalities.
+
+            Args:
+              state (`Tensor`[...,2]): State vector.  Leftmost indices denote
+              chains. Same as for RHS().
+
+            Returns:
+              infection rate
+            """
+
+            R0 = self.params[...,0]
+            mu = self.params[...,1]
+            nu = self.params[...,2]
+            i = state[...,0]
+            s = state[...,1]
+
+            ir = (nu+mu)*R0*i*s
+            return ir
