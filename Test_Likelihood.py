@@ -178,10 +178,10 @@ class loglik(object):
                            solution_times=self.etimes)
 
         self.estates = results.states
-        # But this has shape [self.etimes.shape[0], epipar.shape[:-1], D_Epi].
-        # We want shape [epipar.shape[:-1], self.etimes.shape[0], D_Epi].
+        # But this has shape self.etimes.shape[0] + epipar.shape[:-1] + [D_Epi].
+        # We want shape epipar.shape[:-1] + [D_Epi] + self.etimes.shape[0].
         ls = len(self.estates.shape)
-        p = [i for i in range(1, ls-1)] + [0,ls-1]
+        p = (np.arange(ls) + 1) % ls
         self.estates = tf.transpose(self.estates, perm=p)
 
 #######################################################################
@@ -222,8 +222,8 @@ class loglik(object):
                            solution_times=self.vtimes)
 
         self.vload = results.states[...,0]
-        # But this has shape [self.vtimes.shape[0], vpar.shape[:-1]].
-        # We want [vpar.shape[:-1], self.vtimes.shape[0]]
+        # But this has shape self.vtimes.shape[0] + vpar.shape[:-1].
+        # We want vpar.shape[:-1] + self.vtimes.shape[0]
         r = len(self.vload.shape)
         p = (np.arange(r) + 1) % r
         self.vload = tf.transpose(self.vload, perm=p)
@@ -254,10 +254,10 @@ class loglik(object):
         # array of t - \tau
         tmtau = tf.expand_dims(self.test_data[:,0], 1) -  tf.expand_dims(self.vtimes, 0)
 
-        iv = cubic_interpolation(tmtau, self.etimes[0], self.Epi_cadence
+        iv = cubic_interpolation(tmtau, self.etimes[0], self.Epi_cadence,
                                  self.estates)
 
-        iv = self.em.RHS(iv)[...,0] # Infection rate 
+        iv = self.em.infection_rate(iv) # Infection rate 
 
 
 #######################################################################
@@ -281,31 +281,31 @@ def cubic_interpolation(t, t0, dt, fvals):
 
     Args:
 
-      t (`Tensor`[...]): times of desired interpolation
+      t (`Tensor`[:]): times of desired interpolation
       t0 (float): time corresponding to fvals[...,0]
       dt (float): cadence of equally-spaced times
       fvals (`Tensor`[...,:,:]): Function samples.  Left-most indices correspond
-        to chains. Second-to-last index is over samples. Right-most index is
-        over vector (i.e. state) component
+        to chains. Second-to-last index is over vector (i.e. state) component
+        Right-most index is over samples.
 
     Returns:
-      interpolant (`Tensor`[fvals.shape[:-1] + t.shape]): Interpolant values.
+      interpolant (`Tensor`[fvals.shape[:-1] + t.shape ]): Interpolant values.
     """
-
+                                                        # Shapes:
     ts = t.shape ; fs = fvals.shape
-    nt = (t-t0)/dt  # ts
+    nt = (t-t0)/dt                                      # ts
+ # to guarantee we have data for cubic
     assert(not tf.reduce_any(nt < 1) and 
-           not tf.reduce_any(nt > fs[-1]-1)) # to guarantee we have data for cubic
+           not tf.reduce_any(nt > fs[-1]-2))
 
     i0 = tf.expand_dims(tf.cast(nt, tf.int64) - 1, -1)  # ts + [1]
-    indices = i0 + tf.constant(np.arange(4))         # ts + [4]
-    ftrain = tf.gather(fvals, indices, axis=-2)      # fs[:-2] + ts + [4] + fs[-1]
+    indices = i0 + tf.constant(np.arange(4))            # ts + [4]
+    ftrain = tf.gather(fvals, indices, axis=-1)         # fs[:-1] + ts + [4]
 
-    tt = tf.reshape(nt%1 - 0.5, ts + [1,1])          # ts + [1,1]
-    res = tf.reduce_prod((tt-rtarr), axis=-1)        # ts + [4]
-    res = res * prodarr                              # ts + [4]
-    expand_dims(res, axis=-1)                        # ts + [4,1]
-    res = res * ftrain                               # fs[:-2] + ts + [4] + fs[-1]
-    res = tf.reduce_sum(res, axis=-2)                # fs[:-2] + ts + fs[-1]
+    tt = tf.reshape(nt%1 - 0.5, ts + [1,1])             # ts + [1,1]
+    res = tf.reduce_prod((tt-rtarr), axis=-1)           # ts + [4]
+    res = res * prodarr                                 # ts + [4]
+    res = res * ftrain                                  # fs[:-1] + ts + [4]
+    res = tf.reduce_sum(res, axis=-1)                   # fs[:-1] + ts
 
     return res
