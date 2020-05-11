@@ -46,11 +46,13 @@ class ODE_model(object):
 
 
 #######################################################################
-    def infection_rate(self, state):
+    def infection_rate(self, state, axis):
         """
         Should return the current infection rate, not counting recoveries
         and fatalities.  Calling the base-class version of this method is
-        a NotImplementedError.
+        a NotImplementedError. 'axis' should be the axis of 'state' along
+        which the state components are defined, the other axes corresponding
+        to times and chains.
         """
 
         raise NotImplementedError("Method 'infection_rate' undefined.")
@@ -99,13 +101,16 @@ class SIR(ODE_model):
         return ret
 
 #######################################################################
-        def infection_rate(self, state):
+        def infection_rate(self, state, axis):
             """
             Return infection rate, not counting recoveries and fatalities.
 
             Args:
-              state (`Tensor`[...,2]): State vector.  Leftmost indices denote
-              chains. Same as for RHS().
+              state (`Tensor`[...,2,...]): State vector.  Leftmost indices denote
+              chains, rightmost indices are times of evaluation, axis 'axis'
+              corresponds to state components.
+
+              axis (int): axis along which the state components are defined.
 
             Returns:
               infection rate
@@ -114,8 +119,8 @@ class SIR(ODE_model):
             R0 = self.params[...,0]
             mu = self.params[...,1]
             nu = self.params[...,2]
-            i = state[...,0]
-            s = state[...,1]
+            i = tf.gather(state, 0, axis=axis)
+            s = tf.gather(state, 1, axis=axis)
 
             ir = (nu+mu)*R0*i*s
             return ir

@@ -257,8 +257,14 @@ class loglik(object):
         iv = cubic_interpolation(tmtau, self.etimes[0], self.Epi_cadence,
                                  self.estates)
 
-        iv = self.em.infection_rate(iv) # Infection rate 
+        ir = self.em.infection_rate(iv, axis=-3) # Infection rate 
+         # Shape: chain_shape + self.test_data.shape[0] + self.vtimes.shape
 
+        integral_0 = tf.reduce_sum(ir * self.symptom_fn(self.vload), axis=-1)
+        integral_1 = tf.reduce_sum(ir * self.symptom_fn(self.vload) 
+                                      * self.positive_fn(self.vload), axis=-1)
+
+        return tf.stack((integral_0, integral_1), axis=-1)
 
 #######################################################################
 #######################################################################
