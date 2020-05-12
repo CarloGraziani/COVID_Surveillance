@@ -33,11 +33,15 @@ class loglik(object):
       symptom_fn (callable): Function of current viral load representing the
         probability of exhibiting symptoms. Arguments are (load, parameters).
 
+      prob_s_ibar (float): Probability of symptoms and no infection
+
+      prob_fp (float): False postive probability
+
       Epi_Model (callable): Epidemic model (ODE RHS, subclass of ODE_Dynamics) 
         to be called. The first component is "Infected fraction" i.e. an "SIR"
         model would be an "ISR" model.  Default is SIR().
 
-      Incubation (float): Length of incubation period, used as look-back time
+      Duration (float): Disease duration, used as look-back time
         for viral dynamics integration.
 
       Epi_cadence (float): Time intervals for epidemic model computation.
@@ -50,7 +54,7 @@ class loglik(object):
 #######################################################################
     def __init__(self, test_data, vdyn_ode_fn, positive_fn, 
                  symptom_fn, prob_s_ibar, prob_fp=0.0, Epi_Model=None,
-                 incubation=14, Epi_cadence=0.5, Vir_cadence=0.0625):
+                 duration=24.0, Epi_cadence=0.5, Vir_cadence=0.0625):
         """
         Constructor
         """
@@ -66,7 +70,7 @@ class loglik(object):
         else:
             self.Epi_Model = Epi_Model
 
-        self.incubation = incubation
+        self.duration = duration
 
         if Epi_cadence < Vir_cadence:
             raise ValueError("Epi_cadence should be longer than Vir_cadence")
@@ -128,10 +132,10 @@ class loglik(object):
 
         self._epidemic(epipar)
         self._vdyn(vpar)
-        integrals = self._prob_integrals(pospar, sympar)
+        ig0, ig1 = self._prob_integrals(pospar, sympar)
 
-        p_given_si = integrals[...,1] / integrals[...,0]
-        i_given_s = tf.transpose(integrals[...,0] /(integrals[...,0] + self.prob_s_ibar))
+        p_given_si = ig1 / ig0
+        i_given_s = ig0 /(ig0 + self.prob_s_ibar)
         p_given_ibar_s = self.prob_fp
         ibar_given_s = 1.0 - i_given_s
 
@@ -160,16 +164,16 @@ class loglik(object):
           self.etimes (`Tensor`[:]): Times at which states were computed.
 
         Times of integration are every (self.Epi_cadence * 1 day) starting at 
-        (-incubation - self.Epi_cadence) days relative to start of data, and 
-        ending at +(self.Epi_cadence * 1 day)  day relative to end of data.
+        (-self.duration - 2*self.Epi_cadence) days relative to start of data, and 
+        ending at +2*self.Epi_cadence days relative to end of data.
         """
 
         self.em = self.Epi_Model(epipar)  # Need this in _prob_integrals()
         D_Epi = self.em.Ndim
         initial_state = epipar[...,-D_epi:]
-        initial_time = self.test_data[0,0] - self.incubation - self.Epi_cadence
+        self.initial_time = self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence
         st1 = initial_time
-        st2 = self.test_data[-1,0] + self.Epi_cadence*2
+        st2 = self.test_data[-1,0] + 2.0*self.Epi_cadence
         self.etimes = tf.constant(np.arange(st1, st2, step=self.Epi_cadence, 
                                             dtype=np.float32))
 
@@ -204,16 +208,14 @@ class loglik(object):
           self.vtimes (`Tensor`[:]): Times at which states were computed.
 
         Times of integration are every (self.Vir_cadence * 1 day) starting at 
-        (-incubation - self.Vir_cadence) days relative to start of data, and 
-        ending at +(self.Vir_cadence * 1 day)  day relative to end of data.
+        zero, and ending at self.duration days.
         """
 
         vm = vdyn_ode_fn(vpar)
         D_Vir = vm.Ndim
         initial_state = vpar[...,-D_Vir:]
-        initial_time = self.test_data[0,0] - self.incubation - self.Vir_cadence
-        st1 = initial_time
-        st2 = self.test_data[-1,0] + self.Vir_cadence*2
+        st1 = 0.0
+        st2 = self.duration
         self.vtimes = tf.constant(np.arange(st1, st2, step=self.Vir_cadence, 
                                             dtype=np.float32))
 
@@ -242,17 +244,17 @@ class loglik(object):
             Left-most indices denote chains.
 
         Returns:
+            (ig0, ig1)
+            The required quadratures. The last index is the data index.
 
-          integral (`Tensor`[...,:,2]): The required quadratures. The
-            second-to-last index is the data index.
-
-            integral[...,:,0]: Prob(i,s)
-            integral[...,:,1]: Prob(i,s,p)
+            ig0[...,:]: Prob(i,s)
+            ig1[...,:]: Prob(i,s,p)
 
         """
 
         # array of t - \tau
-        tmtau = tf.expand_dims(self.test_data[:,0], 1) -  tf.expand_dims(self.vtimes, 0)
+        tmtau = tf.expand_dims(self.test_data[:,0], 1) \
+                -  tf.expand_dims(self.vtimes, 0)
 
         iv = cubic_interpolation(tmtau, self.etimes[0], self.Epi_cadence,
                                  self.estates)
@@ -260,11 +262,14 @@ class loglik(object):
         ir = self.em.infection_rate(iv, axis=-3) # Infection rate 
          # Shape: chain_shape + self.test_data.shape[0] + self.vtimes.shape
 
-        integral_0 = tf.reduce_sum(ir * self.symptom_fn(self.vload), axis=-1)
-        integral_1 = tf.reduce_sum(ir * self.symptom_fn(self.vload) 
-                                      * self.positive_fn(self.vload), axis=-1)
+        integrand_1 = ir * self.symptom_fn(self.vload, sympar)
+        integrand_2 = ir * self.symptom_fn(self.vload, sympar) \
+                         * self.positive_fn(self.vload, pospar)
 
-        return tf.stack((integral_0, integral_1), axis=-1)
+        ig_0 = tf.reduce_sum(integrand_1, axis=-1) * self.Vir_cadence
+        ig_1 = tf.reduce_sum(integrand_2, axis=-1) * self.Vir_cadence
+
+        return ig_0, ig_1
 
 #######################################################################
 #######################################################################
