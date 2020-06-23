@@ -136,11 +136,11 @@ class ViralDynamics(ODE_model):
 
       params (`Tensor`[...,:]) Model parameters.  Leftmost indices denote
         chains.
-          params[...,0]: beta, "rate at which virus infects host cells"
-          params[...,1]: c, "production rate of free virions"
+          params[...,0]: mu, "natural death rate of cells"
+          params[...,1]: beta, "rate at which virus infects host cells"
           params[...,2]: alpha, "per capita attrition rate of infected cells"
-          params[...,3]: gamma, "per capita attrition rate of virions"
-          params[...,4]: mu, "natural death rate of cells"
+          params[...,3]: c, "production rate of free virions"
+          params[...,4]: gamma, "per capita attrition rate of virions"
 
     Ndim is 3
     
