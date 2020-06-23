@@ -124,3 +124,76 @@ class SIR(ODE_model):
 
             ir = (nu+mu)*R0*i*s
             return ir
+        
+#######################################################################
+#######################################################################
+#######################################################################
+class ViralDynamics(ODE_model):
+    """
+    Simple viral dynamics model
+    Constructor Args:
+      params (`Tensor`[...,:]) Model parameters.  Leftmost indices denote
+        chains.
+          params[...,0]: beta, "rate at which virus infects host cells"
+          params[...,1]: c, "production rate of free virions"
+          params[...,2]: alpha, "per capita attrition rate of infected cells"
+          params[...,3]: gamma, "per capita attrition rate of virions"
+          params[...,4]: mu, "natural death rate of cells"
+    Ndim is 3
+    
+    """
+
+    Ndim = 3
+    
+
+#######################################################################
+    def RHS(self, time, state):
+        """
+        RHS of viral dynamics ODE.
+        Args:
+          state (`Tensor`[...,2]): State vector.  Leftmost indices denote
+          chains.
+            state[...,0]: Number of uninfected cells
+            state[...,1]: Number of infected cells
+            state[...,2]: Number of free virus particles
+        """
+
+        beta = self.params[...,0]
+        c = self.params[...,1]
+        alpha = self.params[...,2]
+        gamma = self.params[...,3]
+        mu = self.params[...,4]
+        v = state[...,0]
+        x = state[...,1]
+        y = state[...,2]
+        
+        ret0 = c*y -gamma*v -beta*v*x
+        ret1 = mu*(1-x) -beta*v*x
+        ret2 = beta*v*x -alpha*y
+
+        ret = tf.stack((ret0, ret1, ret2), axis=-1)
+        return ret
+
+#######################################################################
+        def virus_concentration(self, state, axis):
+            """
+            Return virus concentration
+            Args:
+              state (`Tensor`[...,2,...]): State vector.  Leftmost indices denote
+              chains, rightmost indices are times of evaluation, axis 'axis'
+              corresponds to state components.
+              axis (int): axis along which the state components are defined.
+            Returns:
+              infection rate
+            """
+
+           # beta = self.params[...,0]
+           # c = self.params[...,1]
+           # alpha = self.params[...,2]
+           # gamma = self.params[...,3]
+           # mu = self.params[...,4]
+           # x = tf.gather(state, 0, axis=axis)
+           # y = tf.gather(state, 1, axis=axis)
+            v = tf.gather(state, 0, axis=axis)
+
+            return v
