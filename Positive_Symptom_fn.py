@@ -19,19 +19,21 @@ class proba_pos_sym:
     
     
 
-    def positive_fn(vload, pospar):
+    def positive_fn(self, vload, pospar):
         """
             does not depent on pospar for now...
             to be written
             
             return: pos_fn proba of a positive test result
         """
+        matrix_threshold = self.threshold* tf.ones(vload[...,:].shape)
+        return tf.math.greater_equal(vload, matrix_threshold)
         
 
 
     
 
-    def symptom_fn(vload, sympar):
+    def symptom_fn(self, vload, sympar):
         """
             does not depent on sympar for now...
             to be written
