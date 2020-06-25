@@ -26,8 +26,11 @@ class proba_pos_sym:
             
             return: pos_fn proba of a positive test result
         """
-        matrix_threshold = self.threshold* tf.ones(vload[...,:].shape)
-        return tf.math.greater_equal(vload, matrix_threshold)
+        matrix_threshold = self.threshold * tf.ones(vload[...,:].shape)
+        pos_fn_bool = tf.math.greater_equal(vload, matrix_threshold) #create tensor of boolean
+        pos_fn_var = tf.Variable(pos_fn_bool)
+        pos_fn = tf.dtypes.cast(pos_fn_var, tf.float32) #convert boolean to float
+        return pos_fn
         
 
 
@@ -38,6 +41,9 @@ class proba_pos_sym:
             does not depent on sympar for now...
             to be written
             
-            return: sym_fn proba of exhibiting symptoms
+            return: sym_fn proba of exhibiting symptoms (constant = 0.6  for now)
+            
+        
             """
-        return 0.6
+        sym_fn = 0.6* tf.ones(vload[...,:].shape)
+        return sym_fn
