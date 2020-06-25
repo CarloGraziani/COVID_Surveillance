@@ -6,6 +6,7 @@
 
 import tensorflow as tf
 import tensorflow_probability as tfp
+import tensorflow_graphics as tfg
 import numpy as np
 
 #######################################################################
@@ -99,10 +100,13 @@ class loglik(object):
         Returns: Log-likelihood (`Tensor`[...]): Log-likelihood indexed over chains.
         """
 
-        pp = self._pos_prob(epipar, vpar, pospars, sympar)
+        pp = self._pos_prob(epipar, vpar, pospar, sympar)
         # The leading indices of pp are chains, the rightmost index is the data index.
+	
+        N_xt = test_data[:,1]  #number of RT-PCR tests performed at epoch t at location x
+        C_xt = test_data[:,2] #number of positive confirmed results from tests
 
-        ll = tf.log(pp) * self.data[:,2] + tf.log(1-pp) * (self.data[:,1] - self.data[:,2])
+        ll = tf.log(tfg.math.math_helpers.factorial(N_xt)) - (tf.log(tfg.math.math_helpers.factorial(N_xt - C_xt)) + tf.log(tfg.math.math_helpers.factorial(C_xt))) + tf.log(pp) * C_xt + tf.log(1-pp) * (N_xt - C_xt)
         ll = tf.reduce_sum(ll, axis=-1)
 
         return ll
@@ -170,15 +174,15 @@ class loglik(object):
 
         self.em = self.Epi_Model(epipar)  # Need this in _prob_integrals()
         D_Epi = self.em.Ndim
-        initial_state = epipar[...,-D_epi:]
+        initial_state = epipar[...,-D_Epi:]
         self.initial_time = self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence
-        st1 = initial_time
+        st1 = self.initial_time
         st2 = self.test_data[-1,0] + 2.0*self.Epi_cadence
         self.etimes = tf.constant(np.arange(st1, st2, step=self.Epi_cadence, 
                                             dtype=np.float32))
 
         DP = tfp.math.ode.DormandPrince()
-        results = DP.solve(self.em.RHS, initial_time, initial_state, 
+        results = DP.solve(self.em.RHS, self.initial_time, initial_state,
                            solution_times=self.etimes)
 
         self.estates = results.states
@@ -189,7 +193,7 @@ class loglik(object):
         self.estates = tf.transpose(self.estates, perm=p)
 
 #######################################################################
-    def _vdyn(vpar):
+    def _vdyn(self,vpar):
         """
         Integrate the virus dynamics. The ODE model has dimension D_Vir. 
 
@@ -211,7 +215,7 @@ class loglik(object):
         zero, and ending at self.duration days.
         """
 
-        vm = vdyn_ode_fn(vpar)
+        vm = self.vdyn_ode_fn(vpar)
         D_Vir = vm.Ndim
         initial_state = vpar[...,-D_Vir:]
         st1 = 0.0
@@ -220,8 +224,8 @@ class loglik(object):
                                             dtype=np.float32))
 
         DP = tfp.math.ode.DormandPrince()
-        results = DP.solve(vm.RHS, initial_time, self.vdyn_init, 
-                           solution_times=self.vtimes)
+        results = DP.solve(vm.RHS, self.initial_time, initial_state,
+                           solution_times=self.vtimes)  #mng replaced vdyn_init by initial_states
 
         self.vload = results.states[...,0]
         # But this has shape self.vtimes.shape[0] + vpar.shape[:-1].
@@ -266,9 +270,13 @@ class loglik(object):
         integrand_2 = ir * self.symptom_fn(self.vload, sympar) \
                          * self.positive_fn(self.vload, pospar)
 
-        ig_0 = tf.reduce_sum(integrand_1, axis=-1) * self.Vir_cadence
-        ig_1 = tf.reduce_sum(integrand_2, axis=-1) * self.Vir_cadence
+	###Need to compute expectations
+        ig_0 = tf.reduce_sum(integrand_1, axis=0) * self.Vir_cadence ##changed axis to 0
+        ig_1 = tf.reduce_sum(integrand_2, axis=0) * self.Vir_cadence
 
+	##computing expectations
+        ig_0 = tf_reduce_mean(ig_0)
+        ig_1 = tf_reduce_mean(ig_1)
         return ig_0, ig_1
 
 #######################################################################
