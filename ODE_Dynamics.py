@@ -160,9 +160,9 @@ class ViralDynamics(ODE_model):
 
           state (`Tensor`[...,2]): State vector.  Leftmost indices denote
           chains.
-            state[...,0]: Number of uninfected cells
-            state[...,1]: Number of infected cells
-            state[...,2]: Number of free virus particles
+            state[...,0]: Number of free virus particles
+            state[...,1]: Number of uninfected cells
+            state[...,2]: Number of infected cells
         """
 
         l = self.params[...,0]
