@@ -80,7 +80,7 @@ class loglik(object):
         
 
 #######################################################################
-    def __call__(self, epipar, vpar, pospar, sympar):
+    def __call__(self, test_data, epipar, vpar, pospar, sympar):
         """
         Log likelihood computation.
 
@@ -102,11 +102,12 @@ class loglik(object):
 
         pp = self._pos_prob(epipar, vpar, pospar, sympar)
         # The leading indices of pp are chains, the rightmost index is the data index.
+        
+        #self.test_data = test_data ## mng needs to look into why she needs to redefine this and add it to the variables of the function
 	
         N_xt = test_data[:,1]  #number of RT-PCR tests performed at epoch t at location x
         C_xt = test_data[:,2] #number of positive confirmed results from tests
-
-        ll = tf.log(tfg.math.math_helpers.factorial(N_xt)) - (tf.log(tfg.math.math_helpers.factorial(N_xt - C_xt)) + tf.log(tfg.math.math_helpers.factorial(C_xt))) + tf.log(pp) * C_xt + tf.log(1-pp) * (N_xt - C_xt)
+        ll =  tf.keras.backend.log(pp) * C_xt + tf.keras.backend.log(1-pp) * (N_xt - C_xt)  #tf.keras.backend.log(tfg.math_helpers.factorial(N_xt)) - (tf.keras.backend.log(tfg.math_helpers.factorial(N_xt - C_xt)) +tf.keras.backend.log(tfg.math_helpers.factorial(C_xt))) +  ##need to add this factorial
         ll = tf.reduce_sum(ll, axis=-1)
 
         return ll
@@ -142,6 +143,9 @@ class loglik(object):
         i_given_s = ig0 /(ig0 + self.prob_s_ibar)
         p_given_ibar_s = self.prob_fp
         ibar_given_s = 1.0 - i_given_s
+        print('Printing probas')
+        print(ig0)
+        print(ig1)
 
         p_given_s = p_given_si * i_given_s + p_given_ibar_s * ibar_given_s
 
@@ -219,15 +223,22 @@ class loglik(object):
         D_Vir = vm.Ndim
         initial_state = vpar[...,-D_Vir:]
         st1 = 0.0
+        vdyn_initial_time = st1
         st2 = self.duration
         self.vtimes = tf.constant(np.arange(st1, st2, step=self.Vir_cadence, 
                                             dtype=np.float32))
+        print("printing solution times")
+        print(self.vtimes)
+        print("printing initial time")
+        print(vdyn_initial_time)
+        print("printing initial state")
+        print(initial_state)
 
         DP = tfp.math.ode.DormandPrince()
-        results = DP.solve(vm.RHS, self.initial_time, initial_state,
-                           solution_times=self.vtimes)  #mng replaced vdyn_init by initial_states
+        results = DP.solve(vm.RHS, vdyn_initial_time, initial_state,
+                           solution_times=self.vtimes)  #mng replaced vdyn_init by initial_states and self.initial_times
 
-        self.vload = results.states[...,0]
+        self.vload = results.states[...,0]  
         # But this has shape self.vtimes.shape[0] + vpar.shape[:-1].
         # We want vpar.shape[:-1] + self.vtimes.shape[0]
         r = len(self.vload.shape)
@@ -262,8 +273,8 @@ class loglik(object):
 
         iv = cubic_interpolation(tmtau, self.etimes[0], self.Epi_cadence,
                                  self.estates)
-
-        ir = self.em.infection_rate(iv, axis=-3) # Infection rate 
+    
+        ir = self.em.infection_rate(iv, axis=-3) # Infection rate  #
          # Shape: chain_shape + self.test_data.shape[0] + self.vtimes.shape
 
         integrand_1 = ir * self.symptom_fn(self.vload, sympar)
@@ -275,8 +286,8 @@ class loglik(object):
         ig_1 = tf.reduce_sum(integrand_2, axis=0) * self.Vir_cadence
 
 	##computing expectations
-        ig_0 = tf_reduce_mean(ig_0)
-        ig_1 = tf_reduce_mean(ig_1)
+        ig_0 = tf.reduce_mean(ig_0)
+        ig_1 = tf.reduce_mean(ig_1)
         return ig_0, ig_1
 
 #######################################################################
@@ -318,7 +329,8 @@ def cubic_interpolation(t, t0, dt, fvals):
            not tf.reduce_any(nt > fs[-1]-2))
 
     i0 = tf.expand_dims(tf.cast(nt, tf.int64) - 1, -1)  # ts + [1]
-    indices = i0 + tf.constant(np.arange(4))            # ts + [4]
+    indices = i0 + tf.constant(np.arange(4))  - 1           # ts + [4] ##mng added -1 to test
+
     ftrain = tf.gather(fvals, indices, axis=-1)         # fs[:-1] + ts + [4]
 
     tt = tf.reshape(nt%1 - 0.5, ts + [1,1])             # ts + [1,1]

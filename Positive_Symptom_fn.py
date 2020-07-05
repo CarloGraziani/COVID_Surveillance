@@ -30,6 +30,12 @@ class proba_pos_sym:
         pos_fn_bool = tf.math.greater_equal(vload, matrix_threshold) #create tensor of boolean
         pos_fn_var = tf.Variable(pos_fn_bool)
         pos_fn = tf.dtypes.cast(pos_fn_var, tf.float32) #convert boolean to float
+        #pos_fn = tf.random.uniform(
+        #                 vload[...,:].shape, minval=0, maxval=1.0, dtype=tf.dtypes.float32, seed=None, name=None
+        #                 )
+#        print('printing pos_fn')
+        print(vload)
+        print(pos_fn)
         return pos_fn
         
 
@@ -38,7 +44,7 @@ class proba_pos_sym:
 
     def symptom_fn(self, vload, sympar):
         """
-            does not depent on sympar for now...
+            does not depend on sympar for now...
             to be written
             
             return: sym_fn proba of exhibiting symptoms (constant = 0.6  for now)
@@ -46,4 +52,6 @@ class proba_pos_sym:
         
             """
         sym_fn = 0.6* tf.ones(vload[...,:].shape)
+#        print('printing sym_fn test')
+#        print(sym_fn)
         return sym_fn
