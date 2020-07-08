@@ -10,8 +10,9 @@ import ODE_Dynamics_viral as odv
 import math
 from random import sample
 
-# Return number tested and number of positives over duration
-n_tests = [0]; n_positives = [0];
+# Return number tested, number of positives, new infections and true negative tests
+n_tests = [0]; n_positives = [0]; 
+n_new_infections = [] ; n_true_negatives = [0]; n_false_positives = [0];
 
 # Set population size and duration of the epidemic
 pop_size = 10000
@@ -73,6 +74,8 @@ I = sample(pop_id, n_i)
 S = [id for id in S if id not in I]
 R = []
 
+n_new_infections.append(len(I))
+
 # Record time stamp of infection for each infected individual
 
 I_T = [0] * len(I)
@@ -127,6 +130,8 @@ while time < duration-1:
     
     # New numbers of I, S, R at time
     dn_s = n_s0 - n_s; dn_r = n_r - n_r0
+    
+    n_new_infections.append(dn_s)
     
     # Update I, S, R compartments
     if dn_s <= len(S):
@@ -202,6 +207,8 @@ while time < duration-1:
     
     # Positives among uninfected
     pos2 = [id for id in smp_ibar if int(np.random.binomial(1, prob_fp, 1)) == 1]
+    n_true_negatives.append(len(tested) - len(smp_i_tested))
+    n_false_positives.append(len(pos2))
     
     # All positive tests
     pos = pos1 + pos2
@@ -214,5 +221,9 @@ while time < duration-1:
     
 import matplotlib.pyplot as plt
 plt.plot(t, n_tests,"g-", t, n_positives, "r-")
+
+simulation_results = np.column_stack((n_tests, n_positives, n_new_infections, n_true_negatives, n_false_positives))
+headings = ['Tests', 'Positives', 'New Infections', 'True Negatives', 'False Positives']
+simulation_results = np.vstack([headings, simulation_results])
     
 
