@@ -225,6 +225,6 @@ simulation_results = np.column_stack((n_tests, n_positives, n_new_infections, n_
 headings = ['Tests', 'Positives', 'New Infections', 'True Negatives', 'False Positives']
 simulation_results = np.vstack([headings, simulation_results])
     
-with open("simulation_output1.txt", "w") as txt_file:
+with open("simulation_output.txt", "w") as txt_file:
     for line in simulation_results:
         txt_file.write(" ".join(line) + "\n")
