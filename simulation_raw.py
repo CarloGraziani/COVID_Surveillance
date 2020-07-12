@@ -16,7 +16,7 @@ n_new_infections = [] ; n_true_negatives = [0]; n_false_positives = [0];
 # Set population size and duration of the epidemic
 pop_size = 10000
 pop_id = [id for id in range(pop_size)]
-duration = 15
+duration = 150
 
 # Set parameters for epidemic model
 R0 = 1.8
