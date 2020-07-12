@@ -6,7 +6,6 @@ import tensorflow_probability as tfp
 import sys
 sys.path.append("..")
 import ODE_Dynamics as od
-import ODE_Dynamics_viral as odv
 import math
 from random import sample
 
@@ -17,7 +16,7 @@ n_new_infections = [] ; n_true_negatives = [0]; n_false_positives = [0];
 # Set population size and duration of the epidemic
 pop_size = 10000
 pop_id = [id for id in range(pop_size)]
-duration = 150
+duration = 15
 
 # Set parameters for epidemic model
 R0 = 1.8
@@ -31,7 +30,7 @@ mu_b, sigma_b = 5, 1
 # Find viral load threshold: 1E-05 of the maximum load
 # Example 1: Threshold for COVID-19 RT-PCR test is 6.25 cp/μL. Maximum load about 6.25E5
 # Example 2: HIV load ranges about (1E4, 1E6). Threshold is 20 for RT-PCR
-v_threshold = 170306.4 * 1E-05
+v_threshold = 170306.4 * 1E-02
 
 # Set probability of exhibiting symptom (studies show about 0.55)
 prob_s_i = 0.55
@@ -189,7 +188,7 @@ while time < duration-1:
         beta = np.random.normal(mu_b, sigma_b, 1)
         L = 0.0025/beta
         par=tf.constant(np.array([[L,0.01,beta*1E-7,0.5,20,10]], dtype=np.float32))
-        mod = odv.ViralDynamics(par)
+        mod = od.ViralDynamics(par)
         V0 = np.random.normal(1E3, 1E2, 1)
         X0 = 1E6
         Y0 = V0
@@ -226,4 +225,6 @@ simulation_results = np.column_stack((n_tests, n_positives, n_new_infections, n_
 headings = ['Tests', 'Positives', 'New Infections', 'True Negatives', 'False Positives']
 simulation_results = np.vstack([headings, simulation_results])
     
-
+with open("simulation_output1.txt", "w") as txt_file:
+    for line in simulation_results:
+        txt_file.write(" ".join(line) + "\n")
