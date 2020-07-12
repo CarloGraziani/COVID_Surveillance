@@ -1,4 +1,4 @@
-# Raw code for epidemic simulation
+# Code for epidemic simulation
 
 import tensorflow as tf
 import numpy as np
