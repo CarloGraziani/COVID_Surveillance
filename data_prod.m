@@ -1,5 +1,5 @@
 clear all;
-N_days = 24.0;
+N_days = 30.0;
 days = 0.0:1.0:N_days;
 data = [];
 a = 30;

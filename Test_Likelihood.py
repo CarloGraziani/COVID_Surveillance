@@ -148,6 +148,7 @@ class loglik(object):
         print(ig1)
 
         p_given_s = p_given_si * i_given_s + p_given_ibar_s * ibar_given_s
+        print(p_given_s)
 
         return p_given_s
 
@@ -227,12 +228,13 @@ class loglik(object):
         st2 = self.duration
         self.vtimes = tf.constant(np.arange(st1, st2, step=self.Vir_cadence, 
                                             dtype=np.float32))
-        print("printing solution times")
-        print(self.vtimes)
-        print("printing initial time")
-        print(vdyn_initial_time)
-        print("printing initial state")
-        print(initial_state)
+        
+#        print("printing solution times")
+#        print(self.vtimes)
+#        print("printing initial time")
+#        print(vdyn_initial_time)
+        #print("printing initial state")
+        #        print(initial_state)
 
         DP = tfp.math.ode.DormandPrince()
         results = DP.solve(vm.RHS, vdyn_initial_time, initial_state,
