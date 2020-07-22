@@ -107,7 +107,10 @@ class loglik(object):
 	
         N_xt = test_data[:,1]  #number of RT-PCR tests performed at epoch t at location x
         C_xt = test_data[:,2] #number of positive confirmed results from tests
-        ll =  tf.keras.backend.log(pp) * C_xt + tf.keras.backend.log(1-pp) * (N_xt - C_xt)  #tf.keras.backend.log(tfg.math_helpers.factorial(N_xt)) - (tf.keras.backend.log(tfg.math_helpers.factorial(N_xt - C_xt)) +tf.keras.backend.log(tfg.math_helpers.factorial(C_xt))) +  ##need to add this factorial
+        ll =  tf.keras.backend.log(pp) * C_xt + tf.keras.backend.log(1-pp) * (N_xt - C_xt)
+        print('printing likelihood')
+        print(ll)
+        #tf.keras.backend.log(tfg.math_helpers.factorial(N_xt)) - (tf.keras.backend.log(tfg.math_helpers.factorial(N_xt - C_xt)) +tf.keras.backend.log(tfg.math_helpers.factorial(C_xt))) +  ##need to add this factorial
         ll = tf.reduce_sum(ll, axis=-1)
 
         return ll
@@ -143,11 +146,10 @@ class loglik(object):
         i_given_s = ig0 /(ig0 + self.prob_s_ibar)
         p_given_ibar_s = self.prob_fp
         ibar_given_s = 1.0 - i_given_s
-        print('Printing probas')
-        print(ig0)
-        print(ig1)
+
 
         p_given_s = p_given_si * i_given_s + p_given_ibar_s * ibar_given_s
+        print('printing p_given_s')
         print(p_given_s)
 
         return p_given_s
@@ -228,13 +230,7 @@ class loglik(object):
         st2 = self.duration
         self.vtimes = tf.constant(np.arange(st1, st2, step=self.Vir_cadence, 
                                             dtype=np.float32))
-        
-#        print("printing solution times")
-#        print(self.vtimes)
-#        print("printing initial time")
-#        print(vdyn_initial_time)
-        #print("printing initial state")
-        #        print(initial_state)
+#
 
         DP = tfp.math.ode.DormandPrince()
         results = DP.solve(vm.RHS, vdyn_initial_time, initial_state,
@@ -279,17 +275,36 @@ class loglik(object):
         ir = self.em.infection_rate(iv, axis=-3) # Infection rate  #
          # Shape: chain_shape + self.test_data.shape[0] + self.vtimes.shape
 
-        integrand_1 = ir * self.symptom_fn(self.vload, sympar)
-        integrand_2 = ir * self.symptom_fn(self.vload, sympar) \
-                         * self.positive_fn(self.vload, pospar)
+        N_days = self.test_data[-1,0]
+        N_days = tf.dtypes.cast(N_days, tf.int32)
+        ir_current = ir[:,0,:]
+        integrand_1 = ir_current * self.symptom_fn(self.vload, sympar) #
+        integrand_1= tf.reshape(integrand_1 , [1,integrand_1.shape[0], integrand_1.shape[1]])
+        integrand_2 = ir_current * self.symptom_fn(self.vload, sympar) \
+            * self.positive_fn(self.vload, pospar)
+        integrand_2= tf.reshape(integrand_2 , [1,integrand_2.shape[0], integrand_2.shape[1]])
+        for index_day in range(N_days):
+
+            ir_current = ir[:,index_day +1,:]
+            integrand_1_new = ir_current * self.symptom_fn(self.vload, sympar)
+            integrand_1_new = tf.reshape(integrand_1_new , [1,integrand_1_new.shape[0], integrand_1_new.shape[1]])
+           
+            integrand_1 = tf.concat([integrand_1, integrand_1_new], axis = 0)
+        
+            integrand_2_new = ir_current * self.symptom_fn(self.vload, sympar) \
+            * self.positive_fn(self.vload, pospar)
+            integrand_2_new = tf.reshape(integrand_2_new , [1,integrand_2_new.shape[0], integrand_2_new.shape[1]])
+            integrand_2 = tf.concat([integrand_2, integrand_2_new], axis = 0)
+        
 
 	###Need to compute expectations
-        ig_0 = tf.reduce_sum(integrand_1, axis=0) * self.Vir_cadence ##changed axis to 0
-        ig_1 = tf.reduce_sum(integrand_2, axis=0) * self.Vir_cadence
+    
+        ig_0 = tf.reduce_sum(integrand_1, axis=-1) * self.Vir_cadence
+        ig_1 = tf.reduce_sum(integrand_2, axis=-1) * self.Vir_cadence
 
 	##computing expectations
-        ig_0 = tf.reduce_mean(ig_0)
-        ig_1 = tf.reduce_mean(ig_1)
+        ig_0 = tf.reduce_mean(ig_0, axis = 1)
+        ig_1 = tf.reduce_mean(ig_1, axis = 1)
         return ig_0, ig_1
 
 #######################################################################

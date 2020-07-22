@@ -34,11 +34,11 @@ class proba_pos_sym:
         #                 vload[...,:].shape, minval=0, maxval=1.0, dtype=tf.dtypes.float32, seed=None, name=None
         #                 )
 #        print('printing pos_fn')
-        print(vload[...,:].shape)
-        print(vload)
-        print(pos_fn)
+#        print(vload[...,:].shape)
+#        print(vload)
+#        print(pos_fn)
         return pos_fn
-        
+
 
 
     
@@ -53,6 +53,4 @@ class proba_pos_sym:
         
             """
         sym_fn = 0.55* tf.ones(vload[...,:].shape)
-#        print('printing sym_fn test')
-#        print(sym_fn)
         return sym_fn
