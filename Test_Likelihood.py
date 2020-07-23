@@ -110,6 +110,8 @@ class loglik(object):
         ll =  tf.keras.backend.log(pp) * C_xt + tf.keras.backend.log(1-pp) * (N_xt - C_xt)
         print('printing likelihood')
         print(ll)
+        print('printing p_given_s')
+        print(pp)
         #tf.keras.backend.log(tfg.math_helpers.factorial(N_xt)) - (tf.keras.backend.log(tfg.math_helpers.factorial(N_xt - C_xt)) +tf.keras.backend.log(tfg.math_helpers.factorial(C_xt))) +  ##need to add this factorial
         ll = tf.reduce_sum(ll, axis=-1)
 
@@ -149,8 +151,7 @@ class loglik(object):
 
 
         p_given_s = p_given_si * i_given_s + p_given_ibar_s * ibar_given_s
-        print('printing p_given_s')
-        print(p_given_s)
+
 
         return p_given_s
 
