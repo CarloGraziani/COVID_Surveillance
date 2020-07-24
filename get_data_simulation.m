@@ -1,5 +1,5 @@
 clear all;
-filename = 'simulation_output_100.txt';
+filename = 'data/simulation_output_100.txt';
 [A,delimiterOut]=importdata(filename)
 M = A.data;
 [nn,mm] = size(M)
