@@ -200,9 +200,7 @@ while time < duration-1:
         v = results.states[:,0,0]
         v_tau = v[...,tau].numpy()
         if v_tau > v_threshold:
-            pos1.append(1)
-        else:
-            pos1.append(0)
+            pos1.append(id)
     
     # Positives among uninfected
     pos2 = [id for id in smp_ibar if int(np.random.binomial(1, prob_fp, 1)) == 1]
