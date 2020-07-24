@@ -33,7 +33,7 @@ class proba_pos_sym:
         #pos_fn = tf.random.uniform(
         #                 vload[...,:].shape, minval=0, maxval=1.0, dtype=tf.dtypes.float32, seed=None, name=None
         #                 )
-#        print('printing pos_fn')
+        #       print('printing pos_fn')
 #        print(vload[...,:].shape)
 #        print(vload)
 #        print(pos_fn)

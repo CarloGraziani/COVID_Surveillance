@@ -119,7 +119,7 @@ class SIR(ODE_model):
         i = tf.gather(state, 0, axis=axis)
         s = tf.gather(state, 1, axis=axis)
         ir = (nu+mu)*R0*i*s
-        print(ir.shape)
+        #print(ir.shape)
         return ir
         
 #    def infection_rate(self, state, axis):

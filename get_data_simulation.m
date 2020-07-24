@@ -1,7 +1,9 @@
-filename = 'simulation_output.txt';
+clear all;
+filename = 'simulation_output_100.txt';
 [A,delimiterOut]=importdata(filename)
 M = A.data;
-N_days = 0:1:148;
+[nn,mm] = size(M)
+N_days = 0:1:(nn-2);
 N_days = N_days';
 N_xt = M(2:end,1);
 C_xt = M(2:end,2);

@@ -55,7 +55,7 @@ class loglik(object):
 #######################################################################
     def __init__(self, test_data, vdyn_ode_fn, positive_fn, 
                  symptom_fn, prob_s_ibar, prob_fp=0.0, Epi_Model=None,
-                 duration=24.0, Epi_cadence=0.5, Vir_cadence=0.0625):
+                 duration=15.0, Epi_cadence=0.5, Vir_cadence=0.0625):
         """
         Constructor
         """
@@ -108,14 +108,14 @@ class loglik(object):
         N_xt = test_data[:,1]  #number of RT-PCR tests performed at epoch t at location x
         C_xt = test_data[:,2] #number of positive confirmed results from tests
         ll =  tf.keras.backend.log(pp) * C_xt + tf.keras.backend.log(1-pp) * (N_xt - C_xt)
-        print('printing likelihood')
-        print(ll)
-        print('printing p_given_s')
-        print(pp)
+#        print('printing likelihood')
+#        print(ll)
+#        print('printing p_given_s')
+#        print(pp)
         #tf.keras.backend.log(tfg.math_helpers.factorial(N_xt)) - (tf.keras.backend.log(tfg.math_helpers.factorial(N_xt - C_xt)) +tf.keras.backend.log(tfg.math_helpers.factorial(C_xt))) +  ##need to add this factorial
         ll = tf.reduce_sum(ll, axis=-1)
 
-        return ll
+        return ll, pp
 
 #######################################################################
     def _pos_prob(self, epipar, vpar, pospar, sympar):
@@ -184,9 +184,13 @@ class loglik(object):
         D_Epi = self.em.Ndim
         initial_state = epipar[...,-D_Epi:]
         self.initial_time = self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence
+#        print('initial time')
+#        print(self.initial_time)
         st1 = self.initial_time
         st2 = self.test_data[-1,0] + 2.0*self.Epi_cadence
-        self.etimes = tf.constant(np.arange(st1, st2, step=self.Epi_cadence, 
+#        print('final time')
+#        print(st2)
+        self.etimes = tf.constant(np.arange(st1, st2, step=self.Epi_cadence,
                                             dtype=np.float32))
 
         DP = tfp.math.ode.DormandPrince()
@@ -272,7 +276,7 @@ class loglik(object):
 
         iv = cubic_interpolation(tmtau, self.etimes[0], self.Epi_cadence,
                                  self.estates)
-    
+
         ir = self.em.infection_rate(iv, axis=-3) # Infection rate  #
          # Shape: chain_shape + self.test_data.shape[0] + self.vtimes.shape
 
@@ -347,7 +351,7 @@ def cubic_interpolation(t, t0, dt, fvals):
            not tf.reduce_any(nt > fs[-1]-2))
 
     i0 = tf.expand_dims(tf.cast(nt, tf.int64) - 1, -1)  # ts + [1]
-    indices = i0 + tf.constant(np.arange(4))  - 1           # ts + [4] ##mng added -1 to test
+    indices = i0 + tf.constant(np.arange(4)) - 1           # ts + [4] ##mng added -1 to test
 
     ftrain = tf.gather(fvals, indices, axis=-1)         # fs[:-1] + ts + [4]
 
