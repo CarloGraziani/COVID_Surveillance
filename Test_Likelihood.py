@@ -108,11 +108,6 @@ class loglik(object):
         N_xt = test_data[:,1]  #number of RT-PCR tests performed at epoch t at location x
         C_xt = test_data[:,2] #number of positive confirmed results from tests
         ll =  tf.keras.backend.log(pp) * C_xt + tf.keras.backend.log(1-pp) * (N_xt - C_xt)
-#        print('printing likelihood')
-#        print(ll)
-#        print('printing p_given_s')
-#        print(pp)
-        #tf.keras.backend.log(tfg.math_helpers.factorial(N_xt)) - (tf.keras.backend.log(tfg.math_helpers.factorial(N_xt - C_xt)) +tf.keras.backend.log(tfg.math_helpers.factorial(C_xt))) +  ##need to add this factorial
         ll = tf.reduce_sum(ll, axis=-1)
 
         return ll, pp
@@ -199,19 +194,17 @@ class loglik(object):
 
         estates = results.states
         look_back_times = tf.cast((self.duration +1)* 2, tf.int32)
-#        print(initial_state[0,0])
+
         estates_lookback = initial_state[0,0] * tf.ones([look_back_times, 1, 2], tf.float32)
         self.estates = tf.concat([estates_lookback, estates], 0)
-#        print(self.estates.shape)
+
         # But this has shape self.etimes.shape[0] + epipar.shape[:-1] + [D_Epi].
         # We want shape epipar.shape[:-1] + [D_Epi] + self.etimes.shape[0].
         ls = len(self.estates.shape)
         p = (np.arange(ls) + 1) % ls
         self.estates = tf.transpose(self.estates, perm=p)
         st1 = self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence
-#        lookback_etimes = tf.constant(np.arange(-self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence, st1, step=self.Epi_cadence,
-#                                                 dtype=np.float32))
-#        self.etimes = tf.concat([lookback_etimes, self.etimes], 0)
+
         self.etimes = tf.constant(np.arange(st1, st2, step=self.Epi_cadence,
                                     dtype=np.float32))
         
