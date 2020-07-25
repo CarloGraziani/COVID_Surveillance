@@ -183,13 +183,13 @@ class loglik(object):
         self.em = self.Epi_Model(epipar)  # Need this in _prob_integrals()
         D_Epi = self.em.Ndim
         initial_state = epipar[...,-D_Epi:]
-        self.initial_time = self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence
-#        print('initial time')
-#        print(self.initial_time)
+        self.initial_time = 0.0 #self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence
+        print('initial time')
+        print(self.initial_time)
         st1 = self.initial_time
         st2 = self.test_data[-1,0] + 2.0*self.Epi_cadence
-#        print('final time')
-#        print(st2)
+        print('final time')
+        print(st2)
         self.etimes = tf.constant(np.arange(st1, st2, step=self.Epi_cadence,
                                             dtype=np.float32))
 
@@ -197,12 +197,25 @@ class loglik(object):
         results = DP.solve(self.em.RHS, self.initial_time, initial_state,
                            solution_times=self.etimes)
 
-        self.estates = results.states
+        estates = results.states
+        look_back_times = tf.cast((self.duration +1)* 2, tf.int32)
+#        print(initial_state[0,0])
+        estates_lookback = initial_state[0,0] * tf.ones([look_back_times, 1, 2], tf.float32)
+        self.estates = tf.concat([estates_lookback, estates], 0)
+#        print(self.estates.shape)
         # But this has shape self.etimes.shape[0] + epipar.shape[:-1] + [D_Epi].
         # We want shape epipar.shape[:-1] + [D_Epi] + self.etimes.shape[0].
         ls = len(self.estates.shape)
         p = (np.arange(ls) + 1) % ls
         self.estates = tf.transpose(self.estates, perm=p)
+        st1 = self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence
+#        lookback_etimes = tf.constant(np.arange(-self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence, st1, step=self.Epi_cadence,
+#                                                 dtype=np.float32))
+#        self.etimes = tf.concat([lookback_etimes, self.etimes], 0)
+        self.etimes = tf.constant(np.arange(st1, st2, step=self.Epi_cadence,
+                                    dtype=np.float32))
+        
+
 
 #######################################################################
     def _vdyn(self,vpar):
