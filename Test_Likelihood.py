@@ -6,6 +6,7 @@
 
 import tensorflow as tf
 import tensorflow_probability as tfp
+import tensorflow_graphics as tfg
 import numpy as np
 
 #######################################################################
@@ -54,7 +55,7 @@ class loglik(object):
 #######################################################################
     def __init__(self, test_data, vdyn_ode_fn, positive_fn, 
                  symptom_fn, prob_s_ibar, prob_fp=0.0, Epi_Model=None,
-                 duration=24.0, Epi_cadence=0.5, Vir_cadence=0.0625):
+                 duration=15.0, Epi_cadence=0.5, Vir_cadence=0.0625):
         """
         Constructor
         """
@@ -79,7 +80,7 @@ class loglik(object):
         
 
 #######################################################################
-    def __call__(self, epipar, vpar, pospar, sympar):
+    def __call__(self, test_data, epipar, vpar, pospar, sympar):
         """
         Log likelihood computation.
 
@@ -99,13 +100,17 @@ class loglik(object):
         Returns: Log-likelihood (`Tensor`[...]): Log-likelihood indexed over chains.
         """
 
-        pp = self._pos_prob(epipar, vpar, pospars, sympar)
+        pp = self._pos_prob(epipar, vpar, pospar, sympar)
         # The leading indices of pp are chains, the rightmost index is the data index.
-
-        ll = tf.log(pp) * self.data[:,2] + tf.log(1-pp) * (self.data[:,1] - self.data[:,2])
+        
+        #self.test_data = test_data ## mng needs to look into why she needs to redefine this and add it to the variables of the function
+	
+        N_xt = test_data[:,1]  #number of RT-PCR tests performed at epoch t at location x
+        C_xt = test_data[:,2] #number of positive confirmed results from tests
+        ll =  tf.keras.backend.log(pp) * C_xt + tf.keras.backend.log(1-pp) * (N_xt - C_xt)
         ll = tf.reduce_sum(ll, axis=-1)
 
-        return ll
+        return ll, pp
 
 #######################################################################
     def _pos_prob(self, epipar, vpar, pospar, sympar):
@@ -139,7 +144,9 @@ class loglik(object):
         p_given_ibar_s = self.prob_fp
         ibar_given_s = 1.0 - i_given_s
 
+
         p_given_s = p_given_si * i_given_s + p_given_ibar_s * ibar_given_s
+
 
         return p_given_s
 
@@ -170,26 +177,41 @@ class loglik(object):
 
         self.em = self.Epi_Model(epipar)  # Need this in _prob_integrals()
         D_Epi = self.em.Ndim
-        initial_state = epipar[...,-D_epi:]
-        self.initial_time = self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence
-        st1 = initial_time
+        initial_state = epipar[...,-D_Epi:]
+        self.initial_time = 0.0 #self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence
+        print('initial time')
+        print(self.initial_time)
+        st1 = self.initial_time
         st2 = self.test_data[-1,0] + 2.0*self.Epi_cadence
-        self.etimes = tf.constant(np.arange(st1, st2, step=self.Epi_cadence, 
+        print('final time')
+        print(st2)
+        self.etimes = tf.constant(np.arange(st1, st2, step=self.Epi_cadence,
                                             dtype=np.float32))
 
         DP = tfp.math.ode.DormandPrince()
-        results = DP.solve(self.em.RHS, initial_time, initial_state, 
+        results = DP.solve(self.em.RHS, self.initial_time, initial_state,
                            solution_times=self.etimes)
 
-        self.estates = results.states
+        estates = results.states
+        look_back_times = tf.cast((self.duration +1)* 2, tf.int32)
+
+        estates_lookback = initial_state[0,0] * tf.ones([look_back_times, 1, 2], tf.float32)
+        self.estates = tf.concat([estates_lookback, estates], 0)
+
         # But this has shape self.etimes.shape[0] + epipar.shape[:-1] + [D_Epi].
         # We want shape epipar.shape[:-1] + [D_Epi] + self.etimes.shape[0].
         ls = len(self.estates.shape)
         p = (np.arange(ls) + 1) % ls
         self.estates = tf.transpose(self.estates, perm=p)
+        st1 = self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence
+
+        self.etimes = tf.constant(np.arange(st1, st2, step=self.Epi_cadence,
+                                    dtype=np.float32))
+        
+
 
 #######################################################################
-    def _vdyn(vpar):
+    def _vdyn(self,vpar):
         """
         Integrate the virus dynamics. The ODE model has dimension D_Vir. 
 
@@ -211,19 +233,21 @@ class loglik(object):
         zero, and ending at self.duration days.
         """
 
-        vm = vdyn_ode_fn(vpar)
+        vm = self.vdyn_ode_fn(vpar)
         D_Vir = vm.Ndim
         initial_state = vpar[...,-D_Vir:]
         st1 = 0.0
+        vdyn_initial_time = st1
         st2 = self.duration
         self.vtimes = tf.constant(np.arange(st1, st2, step=self.Vir_cadence, 
                                             dtype=np.float32))
+#
 
         DP = tfp.math.ode.DormandPrince()
-        results = DP.solve(vm.RHS, initial_time, self.vdyn_init, 
-                           solution_times=self.vtimes)
+        results = DP.solve(vm.RHS, vdyn_initial_time, initial_state,
+                           solution_times=self.vtimes)  #mng replaced vdyn_init by initial_states and self.initial_times
 
-        self.vload = results.states[...,0]
+        self.vload = results.states[...,0]  
         # But this has shape self.vtimes.shape[0] + vpar.shape[:-1].
         # We want vpar.shape[:-1] + self.vtimes.shape[0]
         r = len(self.vload.shape)
@@ -259,16 +283,39 @@ class loglik(object):
         iv = cubic_interpolation(tmtau, self.etimes[0], self.Epi_cadence,
                                  self.estates)
 
-        ir = self.em.infection_rate(iv, axis=-3) # Infection rate 
+        ir = self.em.infection_rate(iv, axis=-3) # Infection rate  #
          # Shape: chain_shape + self.test_data.shape[0] + self.vtimes.shape
 
-        integrand_1 = ir * self.symptom_fn(self.vload, sympar)
-        integrand_2 = ir * self.symptom_fn(self.vload, sympar) \
-                         * self.positive_fn(self.vload, pospar)
+        N_days = self.test_data[-1,0]
+        N_days = tf.dtypes.cast(N_days, tf.int32)
+        ir_current = ir[:,0,:]
+        integrand_1 = ir_current * self.symptom_fn(self.vload, sympar) #
+        integrand_1= tf.reshape(integrand_1 , [1,integrand_1.shape[0], integrand_1.shape[1]])
+        integrand_2 = ir_current * self.symptom_fn(self.vload, sympar) \
+            * self.positive_fn(self.vload, pospar)
+        integrand_2= tf.reshape(integrand_2 , [1,integrand_2.shape[0], integrand_2.shape[1]])
+        for index_day in range(N_days):
 
+            ir_current = ir[:,index_day +1,:]
+            integrand_1_new = ir_current * self.symptom_fn(self.vload, sympar)
+            integrand_1_new = tf.reshape(integrand_1_new , [1,integrand_1_new.shape[0], integrand_1_new.shape[1]])
+           
+            integrand_1 = tf.concat([integrand_1, integrand_1_new], axis = 0)
+        
+            integrand_2_new = ir_current * self.symptom_fn(self.vload, sympar) \
+            * self.positive_fn(self.vload, pospar)
+            integrand_2_new = tf.reshape(integrand_2_new , [1,integrand_2_new.shape[0], integrand_2_new.shape[1]])
+            integrand_2 = tf.concat([integrand_2, integrand_2_new], axis = 0)
+        
+
+	###Need to compute expectations
+    
         ig_0 = tf.reduce_sum(integrand_1, axis=-1) * self.Vir_cadence
         ig_1 = tf.reduce_sum(integrand_2, axis=-1) * self.Vir_cadence
 
+	##computing expectations
+        ig_0 = tf.reduce_mean(ig_0, axis = 1)
+        ig_1 = tf.reduce_mean(ig_1, axis = 1)
         return ig_0, ig_1
 
 #######################################################################
@@ -310,7 +357,8 @@ def cubic_interpolation(t, t0, dt, fvals):
            not tf.reduce_any(nt > fs[-1]-2))
 
     i0 = tf.expand_dims(tf.cast(nt, tf.int64) - 1, -1)  # ts + [1]
-    indices = i0 + tf.constant(np.arange(4))            # ts + [4]
+    indices = i0 + tf.constant(np.arange(4)) - 1           # ts + [4] ##mng added -1 to test
+
     ftrain = tf.gather(fvals, indices, axis=-1)         # fs[:-1] + ts + [4]
 
     tt = tf.reshape(nt%1 - 0.5, ts + [1,1])             # ts + [1,1]
