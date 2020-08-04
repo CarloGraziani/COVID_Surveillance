@@ -108,7 +108,6 @@ class loglik(object):
         N_xt = test_data[:,1]  #number of RT-PCR tests performed at epoch t at location x
         C_xt = test_data[:,2] #number of positive confirmed results from tests
         ll =  tf.keras.backend.log(pp) * C_xt + tf.keras.backend.log(1-pp) * (N_xt - C_xt)
-        print(ll)
         ll = tf.reduce_sum(ll, axis=-1)
 
         return ll, pp
