@@ -108,6 +108,7 @@ class loglik(object):
         N_xt = test_data[:,1]  #number of RT-PCR tests performed at epoch t at location x
         C_xt = test_data[:,2] #number of positive confirmed results from tests
         ll =  tf.keras.backend.log(pp) * C_xt + tf.keras.backend.log(1-pp) * (N_xt - C_xt)
+        print(ll)
         ll = tf.reduce_sum(ll, axis=-1)
 
         return ll, pp
@@ -195,7 +196,7 @@ class loglik(object):
         estates = results.states
         look_back_times = tf.cast((self.duration +1)* 2, tf.int32)
 
-        estates_lookback = initial_state[0,0] * tf.ones([look_back_times, 1, 2], tf.float32)
+        estates_lookback = 0.0 * tf.ones([look_back_times, 1, 2], tf.float32)
         self.estates = tf.concat([estates_lookback, estates], 0)
 
         # But this has shape self.etimes.shape[0] + epipar.shape[:-1] + [D_Epi].
