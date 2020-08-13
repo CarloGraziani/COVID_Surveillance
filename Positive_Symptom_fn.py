@@ -48,9 +48,9 @@ class proba_pos_sym:
             does not depend on sympar for now...
             to be written
             
-            return: sym_fn proba of exhibiting symptoms (constant = 0.6  for now)
+            return: sym_fn proba of exhibiting symptoms if infected (constant = 0.55  for now)
             
         
             """
-        sym_fn = 0.65* tf.ones(vload[...,:].shape)
+        sym_fn = 0.55* tf.ones(vload[...,:].shape)
         return sym_fn
