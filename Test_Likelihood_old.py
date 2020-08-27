@@ -55,7 +55,7 @@ class loglik(object):
 #######################################################################
     def __init__(self, test_data, vdyn_ode_fn, positive_fn, 
                  symptom_fn, prob_s_ibar, prob_fp=0.0, Epi_Model=None,
-                 duration=10.0, Epi_cadence=0.5, Vir_cadence=0.0625):
+                 duration=15.0, Epi_cadence=0.5, Vir_cadence=0.0625):
         """
         Constructor
         """
@@ -137,11 +137,10 @@ class loglik(object):
 
         self._epidemic(epipar)
         self._vdyn(vpar)
-        ig0, ig1, ig2= self._prob_integrals(pospar, sympar)
-        print('lkjmnvlkjnfg')
-        print(1-ig2)
+        ig0, ig1 = self._prob_integrals(pospar, sympar)
+
         p_given_si = ig1 / ig0
-        i_given_s = ig0 /(ig0 + self.prob_s_ibar * (1-ig2))
+        i_given_s = ig0 /(ig0 + self.prob_s_ibar)
         p_given_ibar_s = self.prob_fp
         ibar_given_s = 1.0 - i_given_s
 
@@ -175,59 +174,40 @@ class loglik(object):
         (-self.duration - 2*self.Epi_cadence) days relative to start of data, and 
         ending at +2*self.Epi_cadence days relative to end of data.
         """
+
         self.em = self.Epi_Model(epipar)  # Need this in _prob_integrals()
-        D_epi = self.em.Ndim
-        initial_state = epipar[...,-D_epi:]
-        self.initial_time = self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence
-        st1 = self.initial_time
+        D_Epi = self.em.Ndim
+        initial_state = epipar[...,-D_Epi:]
+        self.initial_time = 0.0 #self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence
         print('initial time')
-        print(st1)
+        print(self.initial_time)
+        st1 = self.initial_time
         st2 = self.test_data[-1,0] + 2.0*self.Epi_cadence
+        print('final time')
+        print(st2)
         self.etimes = tf.constant(np.arange(st1, st2, step=self.Epi_cadence,
                                             dtype=np.float32))
-            
+
         DP = tfp.math.ode.DormandPrince()
-        results = DP.solve(self.em.RHS, self.initial_time, initial_state,solution_times=self.etimes)
-                                            
-        self.estates = results.states
-                                            # But this has shape self.etimes.shape[0] + epipar.shape[:-1] + [D_Epi].
-                                            # We want shape epipar.shape[:-1] + [D_Epi] + self.etimes.shape[0].
+        results = DP.solve(self.em.RHS, self.initial_time, initial_state,
+                           solution_times=self.etimes)
+
+        estates = results.states
+        look_back_times = tf.cast((self.duration +1)* 2, tf.int32)
+
+        estates_lookback = initial_state[0,0] * tf.ones([look_back_times, 1, 2], tf.float32)
+        self.estates = tf.concat([estates_lookback, estates], 0)
+
+        # But this has shape self.etimes.shape[0] + epipar.shape[:-1] + [D_Epi].
+        # We want shape epipar.shape[:-1] + [D_Epi] + self.etimes.shape[0].
         ls = len(self.estates.shape)
         p = (np.arange(ls) + 1) % ls
         self.estates = tf.transpose(self.estates, perm=p)
+        st1 = self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence
 
-#        self.em = self.Epi_Model(epipar)  # Need this in _prob_integrals()
-#        D_Epi = self.em.Ndim
-#        initial_state = epipar[...,-D_Epi:]
-#        self.initial_time = 0.0 #self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence
-
-#        st1 = self.initial_time
-#        st2 = self.test_data[-1,0] + 2.0*self.Epi_cadence
-#        print('final time')
-#        print(st2)
-#        self.etimes = tf.constant(np.arange(st1, st2, step=self.Epi_cadence,
-#                                            dtype=np.float32))
-#
-#        DP = tfp.math.ode.DormandPrince()
-#        results = DP.solve(self.em.RHS, self.initial_time, initial_state,
-#                           solution_times=self.etimes)
-#
-#        estates = results.states
-#        look_back_times = tf.cast((self.duration +1)* 2, tf.int32)
-#
-#        estates_lookback = 0.0 * tf.ones([look_back_times, 1, 2], tf.float32)
-#        self.estates = tf.concat([estates_lookback, estates], 0)
-#
-#        # But this has shape self.etimes.shape[0] + epipar.shape[:-1] + [D_Epi].
-#        # We want shape epipar.shape[:-1] + [D_Epi] + self.etimes.shape[0].
-#        ls = len(self.estates.shape)
-#        p = (np.arange(ls) + 1) % ls
-#        self.estates = tf.transpose(self.estates, perm=p)
-#        st1 = self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence
-#
-#        self.etimes = tf.constant(np.arange(st1, st2, step=self.Epi_cadence,
-#                                    dtype=np.float32))
-
+        self.etimes = tf.constant(np.arange(st1, st2, step=self.Epi_cadence,
+                                    dtype=np.float32))
+        
 
 
 #######################################################################
@@ -302,16 +282,11 @@ class loglik(object):
 
         iv = cubic_interpolation(tmtau, self.etimes[0], self.Epi_cadence,
                                  self.estates)
-        
-       
+
         ir = self.em.infection_rate(iv, axis=-3) # Infection rate  #
          # Shape: chain_shape + self.test_data.shape[0] + self.vtimes.shape
-#        print('printint infection rates')
-#        print(self.estates)
-#        print('end printing')
 
-        N_days = self.test_data[-1,0] - self.test_data[0,0]
-        print(N_days)
+        N_days = self.test_data[-1,0]
         N_days = tf.dtypes.cast(N_days, tf.int32)
         ir_current = ir[:,0,:]
         integrand_1 = ir_current * self.symptom_fn(self.vload, sympar) #
@@ -319,10 +294,6 @@ class loglik(object):
         integrand_2 = ir_current * self.symptom_fn(self.vload, sympar) \
             * self.positive_fn(self.vload, pospar)
         integrand_2= tf.reshape(integrand_2 , [1,integrand_2.shape[0], integrand_2.shape[1]])
-        
-        
-        integrand_3 = ir_current #
-        integrand_3= tf.reshape(integrand_3 , [1,integrand_3.shape[0], integrand_3.shape[1]])
         for index_day in range(N_days):
 
             ir_current = ir[:,index_day +1,:]
@@ -335,24 +306,19 @@ class loglik(object):
             * self.positive_fn(self.vload, pospar)
             integrand_2_new = tf.reshape(integrand_2_new , [1,integrand_2_new.shape[0], integrand_2_new.shape[1]])
             integrand_2 = tf.concat([integrand_2, integrand_2_new], axis = 0)
-            integrand_3_new = ir_current
-            integrand_3_new = tf.reshape(integrand_3_new , [1,integrand_3_new.shape[0], integrand_3_new.shape[1]])
-            
-            integrand_3 = tf.concat([integrand_3, integrand_3_new], axis = 0)
         
 
-        ###Need to compute expectations
-        
+	###Need to compute expectations
+    
         ig_0 = tf.reduce_sum(integrand_1, axis=-1) * self.Vir_cadence
         ig_1 = tf.reduce_sum(integrand_2, axis=-1) * self.Vir_cadence
-        ig_2 = tf.reduce_sum(integrand_3, axis=-1) * self.Vir_cadence
-        
-        ##computing expectations
+
+	##computing expectations
         ig_0 = tf.reduce_mean(ig_0, axis = 1)
         ig_1 = tf.reduce_mean(ig_1, axis = 1)
-        ig_2 = tf.reduce_mean(ig_2, axis = 1)
-        
-        return ig_0, ig_1, ig_2#######################################################################
+        return ig_0, ig_1
+
+#######################################################################
 #######################################################################
 #######################################################################
 
