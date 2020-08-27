@@ -190,6 +190,9 @@ class loglik(object):
         results = DP.solve(self.em.RHS, self.initial_time, initial_state,solution_times=self.etimes)
                                             
         self.estates = results.states
+        print('printing infection rates')
+        print(self.estates)
+        print('end printing')
                                             # But this has shape self.etimes.shape[0] + epipar.shape[:-1] + [D_Epi].
                                             # We want shape epipar.shape[:-1] + [D_Epi] + self.etimes.shape[0].
         ls = len(self.estates.shape)
@@ -306,9 +309,7 @@ class loglik(object):
        
         ir = self.em.infection_rate(iv, axis=-3) # Infection rate  #
          # Shape: chain_shape + self.test_data.shape[0] + self.vtimes.shape
-#        print('printint infection rates')
-#        print(self.estates)
-#        print('end printing')
+
 
         N_days = self.test_data[-1,0] - self.test_data[0,0]
         print(N_days)
