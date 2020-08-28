@@ -138,8 +138,6 @@ class loglik(object):
         self._epidemic(epipar)
         self._vdyn(vpar)
         ig0, ig1, ig2= self._prob_integrals(pospar, sympar)
-        print('lkjmnvlkjnfg')
-        print(1-ig2)
         p_given_si = ig1 / ig0
         i_given_s = ig0 /(ig0 + self.prob_s_ibar * (1-ig2))
         p_given_ibar_s = self.prob_fp
@@ -183,6 +181,8 @@ class loglik(object):
         print('initial time')
         print(st1)
         st2 = self.test_data[-1,0] + 2.0*self.Epi_cadence
+        print('final time')
+        print(st2)
         self.etimes = tf.constant(np.arange(st1, st2, step=self.Epi_cadence,
                                             dtype=np.float32))
             
@@ -190,10 +190,10 @@ class loglik(object):
         results = DP.solve(self.em.RHS, self.initial_time, initial_state,solution_times=self.etimes)
                                             
         self.estates = results.states
-        print('printing infection rates')
-        print(self.estates)
-        print('end printing')
-                                            # But this has shape self.etimes.shape[0] + epipar.shape[:-1] + [D_Epi].
+#        print('printing infection rates')
+#        print(self.estates)
+#        print('end printing')
+#                                            # But this has shape self.etimes.shape[0] + epipar.shape[:-1] + [D_Epi].
                                             # We want shape epipar.shape[:-1] + [D_Epi] + self.etimes.shape[0].
         ls = len(self.estates.shape)
         p = (np.arange(ls) + 1) % ls
@@ -262,7 +262,7 @@ class loglik(object):
         st1 = 0.0
         vdyn_initial_time = st1
         st2 = self.duration
-        self.vtimes = tf.constant(np.arange(st1, st2, step=self.Vir_cadence, 
+        self.vtimes = tf.constant(np.arange(st1, st2, step=self.Vir_cadence,
                                             dtype=np.float32))
 #
 
@@ -311,8 +311,7 @@ class loglik(object):
          # Shape: chain_shape + self.test_data.shape[0] + self.vtimes.shape
 
 
-        N_days = self.test_data[-1,0] - self.test_data[0,0]
-        print(N_days)
+        N_days = self.test_data[-1,0] - self.test_data[0,0] 
         N_days = tf.dtypes.cast(N_days, tf.int32)
         ir_current = ir[:,0,:]
         integrand_1 = ir_current * self.symptom_fn(self.vload, sympar) #
