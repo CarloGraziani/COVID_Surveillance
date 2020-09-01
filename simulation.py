@@ -68,7 +68,7 @@ def sample_viral_load(mu_b = 5, sigma_b = 1, duration = 160):
     
     return vload
 
-def simulate_epidemic(vload, duration = 160, pop_size = 10000, prob_s_i = 0.55, prob_s_ibar = 0.1, prob_fp = 0, v_threshold = 170306.4 * 1E-05):
+def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, prob_s_i = 0.55, prob_s_ibar = 0.1, prob_fp = 0, v_threshold = 170306.4 * 1E-05):
     
     sample_size = len(vload)
     n_tests = []; n_positives = []; n_new_infections = [] ; n_true_negatives = []; n_false_positives = [];
@@ -126,7 +126,7 @@ def simulate_epidemic(vload, duration = 160, pop_size = 10000, prob_s_i = 0.55, 
     positives = []
     
     time = 1
-    while time < 10:
+    while time < start_day:
     
         # New births
         n_b = math.floor(0.5 + mu * len(S))
