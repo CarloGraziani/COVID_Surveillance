@@ -55,7 +55,7 @@ class loglik(object):
 #######################################################################
     def __init__(self, test_data, vdyn_ode_fn, positive_fn, 
                  symptom_fn, prob_s_ibar, prob_fp=0.0, Epi_Model=None,
-                 duration=10.0, Epi_cadence=0.5, Vir_cadence=0.0625):
+                 duration=8.0, Epi_cadence=0.5, Vir_cadence=1.):
         """
         Constructor
         """
@@ -176,11 +176,11 @@ class loglik(object):
         self.em = self.Epi_Model(epipar)  # Need this in _prob_integrals()
         D_epi = self.em.Ndim
         initial_state = epipar[...,-D_epi:]
-        self.initial_time = self.test_data[0,0] - self.duration - 2.0*self.Epi_cadence
+        self.initial_time = self.test_data[0,0] - self.duration - 2.*self.Epi_cadence #mng took 2_epi_cadence
         st1 = self.initial_time
         print('initial time')
         print(st1)
-        st2 = self.test_data[-1,0] + 2.0*self.Epi_cadence
+        st2 = self.test_data[-1,0] + 2.*self.Epi_cadence #mng took 2_epi_cadence
         print('final time')
         print(st2)
         self.etimes = tf.constant(np.arange(st1, st2, step=self.Epi_cadence,
@@ -190,9 +190,7 @@ class loglik(object):
         results = DP.solve(self.em.RHS, self.initial_time, initial_state,solution_times=self.etimes)
                                             
         self.estates = results.states
-#        print('printing infection rates')
-#        print(self.estates)
-#        print('end printing')
+        
 #                                            # But this has shape self.etimes.shape[0] + epipar.shape[:-1] + [D_Epi].
                                             # We want shape epipar.shape[:-1] + [D_Epi] + self.etimes.shape[0].
         ls = len(self.estates.shape)
@@ -300,52 +298,53 @@ class loglik(object):
         """
 
         # array of t - \tau
-        tmtau = tf.expand_dims(self.test_data[:,0], 1) \
-                -  tf.expand_dims(self.vtimes, 0)
-
-        iv = cubic_interpolation(tmtau, self.etimes[0], self.Epi_cadence,
-                                 self.estates)
         
-       
+        tmtau = tf.expand_dims(self.test_data[:,0], 1) \
+           -  tf.expand_dims(self.vtimes, 0)
+
+               #iv = self.ir_lookback(self.estates, self.duration)   #
+        iv =  cubic_interpolation(tmtau, self.etimes[0], self.Epi_cadence,self.estates)
+        
+
         ir = self.em.infection_rate(iv, axis=-3) # Infection rate  #
          # Shape: chain_shape + self.test_data.shape[0] + self.vtimes.shape
-
 
         N_days = self.test_data[-1,0] - self.test_data[0,0] 
         N_days = tf.dtypes.cast(N_days, tf.int32)
         ir_current = ir[:,0,:]
-        integrand_1 = ir_current * self.symptom_fn(self.vload, sympar) #
-        integrand_1= tf.reshape(integrand_1 , [1,integrand_1.shape[0], integrand_1.shape[1]])
-        integrand_2 = ir_current * self.symptom_fn(self.vload, sympar) \
+        integrand_0 = ir_current * self.symptom_fn(self.vload, sympar) #
+        integrand_0= tf.reshape(integrand_0 , [1,integrand_0.shape[0], integrand_0.shape[1]])
+        
+        integrand_1 = ir_current * self.symptom_fn(self.vload, sympar) \
             * self.positive_fn(self.vload, pospar)
+        integrand_1= tf.reshape(integrand_1 , [1,integrand_1.shape[0], integrand_1.shape[1]])
+        
+        integrand_2 = ir_current #
         integrand_2= tf.reshape(integrand_2 , [1,integrand_2.shape[0], integrand_2.shape[1]])
-        
-        
-        integrand_3 = ir_current #
-        integrand_3= tf.reshape(integrand_3 , [1,integrand_3.shape[0], integrand_3.shape[1]])
         for index_day in range(N_days):
 
             ir_current = ir[:,index_day +1,:]
-            integrand_1_new = ir_current * self.symptom_fn(self.vload, sympar)
-            integrand_1_new = tf.reshape(integrand_1_new , [1,integrand_1_new.shape[0], integrand_1_new.shape[1]])
-           
-            integrand_1 = tf.concat([integrand_1, integrand_1_new], axis = 0)
-        
-            integrand_2_new = ir_current * self.symptom_fn(self.vload, sympar) \
-            * self.positive_fn(self.vload, pospar)
-            integrand_2_new = tf.reshape(integrand_2_new , [1,integrand_2_new.shape[0], integrand_2_new.shape[1]])
-            integrand_2 = tf.concat([integrand_2, integrand_2_new], axis = 0)
-            integrand_3_new = ir_current
-            integrand_3_new = tf.reshape(integrand_3_new , [1,integrand_3_new.shape[0], integrand_3_new.shape[1]])
             
-            integrand_3 = tf.concat([integrand_3, integrand_3_new], axis = 0)
+            integrand_0_new = ir_current * self.symptom_fn(self.vload, sympar)
+            integrand_0_new = tf.reshape(integrand_0_new , [1,integrand_0_new.shape[0], integrand_0_new.shape[1]])
+            integrand_0 = tf.concat([integrand_0, integrand_0_new], axis = 0)
+        
+            integrand_1_new = ir_current * self.symptom_fn(self.vload, sympar) \
+            * self.positive_fn(self.vload, pospar)
+            integrand_1_new = tf.reshape(integrand_1_new , [1,integrand_1_new.shape[0], integrand_1_new.shape[1]])
+            integrand_1 = tf.concat([integrand_1, integrand_1_new], axis = 0)
+            
+            integrand_2_new = ir_current
+            integrand_2_new = tf.reshape(integrand_2_new , [1,integrand_2_new.shape[0], integrand_2_new.shape[1]])
+            
+            integrand_2 = tf.concat([integrand_2, integrand_2_new], axis = 0)
         
 
         ###Need to compute expectations
         
-        ig_0 = tf.reduce_sum(integrand_1, axis=-1) * self.Vir_cadence
-        ig_1 = tf.reduce_sum(integrand_2, axis=-1) * self.Vir_cadence
-        ig_2 = tf.reduce_sum(integrand_3, axis=-1) * self.Vir_cadence
+        ig_0 = tf.reduce_sum(integrand_0, axis=-1) * self.Vir_cadence
+        ig_1 = tf.reduce_sum(integrand_1, axis=-1) * self.Vir_cadence
+        ig_2 = tf.reduce_sum(integrand_2, axis=-1) * self.Vir_cadence
         
         ##computing expectations
         ig_0 = tf.reduce_mean(ig_0, axis = 1)
@@ -355,6 +354,22 @@ class loglik(object):
         return ig_0, ig_1, ig_2#######################################################################
 #######################################################################
 #######################################################################
+    def ir_lookback(self, estates, look_back_time):
+        lb_time =  tf.dtypes.cast(look_back_time, tf.int32)
+        N_days = self.test_data[-1,0] - self.test_data[0,0]
+        N_days = tf.dtypes.cast(N_days, tf.int32)
+
+        new_estates = estates[:, :, lb_time +1 :1:-1]
+
+        for i in range(N_days ):
+            new_estates_current = estates[:,:, i + 1 + lb_time + 1 : i + 1 + 1:-1]
+            new_estates = tf.concat([new_estates, new_estates_current], axis = 0)
+        
+        new_estates = tf.transpose(new_estates, perm = [1, 0 , 2])
+        new_estates = tf.reshape(new_estates, [1, new_estates.shape[0],new_estates.shape[1], new_estates.shape[2]])
+    
+    
+        return (new_estates)
 
 rtarr = np.array([[-0.5,0.5,1.5],
                   [-1.5,0.5,1.5],
@@ -365,40 +380,46 @@ rtarr = tf.constant(rtarr)
 prodarr = np.array([-6.0, 2.0, -2.0, 6.0], dtype=np.float32)
 prodarr = tf.constant(1/prodarr)
 
+
+
+
+
 def cubic_interpolation(t, t0, dt, fvals):
     """
-    Produce a cubic interpolation of the vector function whose samples spaced
-    by dt starting at t0 are in the array fvals, using the Lagrange
-    interpolation formula.
-
-    Args:
-
-      t (`Tensor`[:]): times of desired interpolation
-      t0 (float): time corresponding to fvals[...,0]
-      dt (float): cadence of equally-spaced times
-      fvals (`Tensor`[...,:,:]): Function samples.  Left-most indices correspond
-        to chains. Second-to-last index is over vector (i.e. state) component
-        Right-most index is over samples.
-
-    Returns:
-      interpolant (`Tensor`[fvals.shape[:-1] + t.shape ]): Interpolant values.
+#    Produce a cubic interpolation of the vector function whose samples spaced
+#    by dt starting at t0 are in the array fvals, using the Lagrange
+#    interpolation formula.
+#
+#    Args:
+#
+#      t (`Tensor`[:]): times of desired interpolation
+#      t0 (float): time corresponding to fvals[...,0]
+#      dt (float): cadence of equally-spaced times
+#      fvals (`Tensor`[...,:,:]): Function samples.  Left-most indices correspond
+#        to chains. Second-to-last index is over vector (i.e. state) component
+#        Right-most index is over samples.
+#
+#    Returns:
+#      interpolant (`Tensor`[fvals.shape[:-1] + t.shape ]): Interpolant values.
     """
+
+
                                                         # Shapes:
     ts = t.shape ; fs = fvals.shape
     nt = (t-t0)/dt                                      # ts
  # to guarantee we have data for cubic
-    assert(not tf.reduce_any(nt < 1) and 
-           not tf.reduce_any(nt > fs[-1]-2))
+    assert(not tf.reduce_any(nt < 1) and
+          not tf.reduce_any(nt > fs[-1]-2))
 
     i0 = tf.expand_dims(tf.cast(nt, tf.int64) - 1, -1)  # ts + [1]
     indices = i0 + tf.constant(np.arange(4)) - 1           # ts + [4] ##mng added -1 to test
-
+##
     ftrain = tf.gather(fvals, indices, axis=-1)         # fs[:-1] + ts + [4]
-
+##
     tt = tf.reshape(nt%1 - 0.5, ts + [1,1])             # ts + [1,1]
     res = tf.reduce_prod((tt-rtarr), axis=-1)           # ts + [4]
     res = res * prodarr                                 # ts + [4]
     res = res * ftrain                                  # fs[:-1] + ts + [4]
     res = tf.reduce_sum(res, axis=-1)                   # fs[:-1] + ts
-
+#
     return res

@@ -52,5 +52,5 @@ class proba_pos_sym:
             
         
             """
-        sym_fn = 0.55* tf.ones(vload[...,:].shape) #+ 0.45*prob_i;
+        sym_fn = .55* tf.ones(vload[...,:].shape) #+ 0.45*prob_i;
         return sym_fn
