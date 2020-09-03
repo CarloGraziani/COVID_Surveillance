@@ -274,6 +274,8 @@ class loglik(object):
         r = len(self.vload.shape)
         p = (np.arange(r) + 1) % r
         self.vload = tf.transpose(self.vload, perm=p)
+        print('printing vload')
+        print(self.vload)
 
 #######################################################################
     def _prob_integrals(self, pospar, sympar):
