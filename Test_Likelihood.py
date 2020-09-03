@@ -354,7 +354,10 @@ class loglik(object):
         return ig_0, ig_1, ig_2#######################################################################
 #######################################################################
 #######################################################################
+######## Function to recast infection rate into right format without the interpolation wheb\n epi_cadence=vir_cadence=1
     def ir_lookback(self, estates, look_back_time):
+        if self.Epi_cadence != 1. or self.Vir_cadence != 1.:
+            raise ValueError("Epi_cadence and than Vir_cadence should both be 1. ")
         lb_time =  tf.dtypes.cast(look_back_time, tf.int32)
         N_days = self.test_data[-1,0] - self.test_data[0,0]
         N_days = tf.dtypes.cast(N_days, tf.int32)
