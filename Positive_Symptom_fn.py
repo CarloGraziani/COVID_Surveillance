@@ -1,6 +1,6 @@
 import tensorflow as tf
 import tensorflow_probability as tfp
-import tensorflow_graphics as tfg
+#import tensorflow_graphics as tfg
 import numpy as np
 
 
@@ -48,9 +48,15 @@ class proba_pos_sym:
             does not depend on sympar for now...
             to be written
             
-            return: sym_fn proba of exhibiting symptoms (constant = 0.6  for now)
+            return: sym_fn proba of exhibiting symptoms, if infected (constant = 0.55  for now)
             
         
             """
-        sym_fn = 0.65* tf.ones(vload[...,:].shape)
+        #sym_fn = 0.55* tf.ones(vload[...,:].shape)
+        
+        matrix_threshold = self.threshold * tf.ones(vload[...,:].shape)
+        sym_fn_bool = tf.math.greater_equal(vload, matrix_threshold) #create tensor of boolean
+        sym_fn_var = tf.Variable(sym_fn_bool)
+        sym_fn = tf.dtypes.cast(sym_fn_var, tf.float32)
+        
         return sym_fn
