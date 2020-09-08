@@ -71,22 +71,6 @@ def sample_viral_load(mu_b = 5, sigma_b = 1, duration = 160):
     
     return vload
 
-def testing_distribution(vload):
-    # Compute empirical distribution of viral load peak days
-    maxpos = []
-    for id in range(len(vload)):
-        v = vload[id,:].numpy()
-        pos = np.argmax(v)
-        maxpos.append(pos)
-    from collections import Counter
-    v_dist = Counter(maxpos)
-    vmax_prob = []
-    for x in range(vload.shape[1]):
-        vmax_prob.append(v_dist[x]/len(vload))
-        
-    return vmax_prob
-
-
 def get_symptom_threshold(vload):
     # Compute empirical distribution of viral load peak days
     max_vload = []
@@ -98,6 +82,23 @@ def get_symptom_threshold(vload):
     s_threshold = np.percentile(max_vload, 40)
         
     return s_threshold
+
+def testing_distribution(vload):
+    # Compute empirical distribution of viral load peak days
+    symp_threshold = get_symptom_threshold(vload)
+    maxpos = []
+    for id in range(len(vload)):
+        v = vload[id,:].numpy()
+        if max(v) > symp_threshold:
+            pos = np.argmax(v)
+            maxpos.append(pos)
+    from collections import Counter
+    v_dist = Counter(maxpos)
+    vmax_prob = []
+    for x in range(vload.shape[1]):
+        vmax_prob.append(v_dist[x]/len(vload))
+        
+    return vmax_prob
 
     
 
