@@ -18,33 +18,36 @@ from random import sample
 #######################################################################
 
 def sample_viral_load(mu_b = 5, sigma_b = 1, duration = 160):
-    
+    # Store 1000 viral load curves
     sample_size = 1000
     k = 1
     index = 1
     beta = np.random.normal(mu_b, sigma_b, 1)   #"rate at which virus infects host cells"
     L = 0.0025/beta
-    par=np.array([[L,0.01,beta*1E-7,0.5,20.0,10.0]])
+    
     V0 = np.random.normal(1E3, 1E2, 1)
     X0 = 1E6
     Y0 = V0
+    
+    par=np.array([[L,0.01,beta*1E-7,0.5,20.0,10.0,V0,X0,Y0]])
     init_state=(np.array([[V0,X0,Y0]], dtype=np.float32))
     while index <= sample_size - 1:
         beta = np.random.normal(mu_b, sigma_b, 1)   #"rate at which virus infects host cells"
         L = 0.0025/beta
-        par_new=np.array([[L,0.01,beta*1E-7,0.5,20.0,10.0]])
-        par = np.concatenate((par, par_new), axis = 0)
+        
         V0 = np.random.normal(1E3, 1E2, 1)
         X0 = 1E6
         Y0 = V0
+        
+        par_new=np.array([[L,0.01,beta*1E-7,0.5,20.0,10.0,V0,X0,Y0]])
+        par = np.concatenate((par, par_new), axis = 0)
+        
         init_state_new=(np.array([[V0,X0,Y0]], dtype=np.float32))
         init_state = np.concatenate((init_state, init_state_new), 0)
 
         index +=1       
 
     vpar = tf.constant(par, dtype=tf.float32)
-    pospar = par
-    sympar = par
 
     vm = od.ViralDynamics(vpar)
     D_Vir = vm.Ndim
@@ -68,8 +71,39 @@ def sample_viral_load(mu_b = 5, sigma_b = 1, duration = 160):
     
     return vload
 
+def testing_distribution(vload):
+    # Compute empirical distribution of viral load peak days
+    maxpos = []
+    for id in range(len(vload)):
+        v = vload[id,:].numpy()
+        pos = np.argmax(v)
+        maxpos.append(pos)
+    from collections import Counter
+    v_dist = Counter(maxpos)
+    vmax_prob = []
+    for x in range(vload.shape[1]):
+        vmax_prob.append(v_dist[x]/len(vload))
+        
+    return vmax_prob
+
+
+def get_symptom_threshold(vload):
+    # Compute empirical distribution of viral load peak days
+    max_vload = []
+    for id in range(len(vload)):
+        v = vload[id,:].numpy()
+        maxload = max(v)
+        max_vload.append(maxload)
+        
+    s_threshold = np.percentile(max_vload, 40)
+        
+    return s_threshold
+
+    
+
 def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, prob_s_i = 0.55, prob_s_ibar = 0.1, prob_fp = 0, v_threshold = 170306.4 * 1E-05):
     
+    symp_threshold = get_symptom_threshold(vload)
     sample_size = len(vload)
     n_tests = []; n_positives = []; n_new_infections = [] ; n_true_negatives = []; n_false_positives = [];
 
@@ -268,8 +302,16 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
     
         # Choose infected individuals who are symptomatic
         smp_i = []; I_T_smp = []
+        #for id in range(len(I)):
+         #   if int(np.random.binomial(size = 1, n = 1, p = prob_s_i))== 1:
+          #      smp_i.append(I[id])
+           #     I_T_smp.append(I_T[id])
+              
         for id in range(len(I)):
-            if int(np.random.binomial(size = 1, n = 1, p = prob_s_i))== 1:
+            tau = int(time - I_T[id])
+            random_id = sample(range(sample_size), 1)[0]
+            v_tau = vload[random_id, tau].numpy()
+            if v_tau > symp_threshold:
                 smp_i.append(I[id])
                 I_T_smp.append(I_T[id])
     
@@ -318,7 +360,7 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
         print(time)
     
     results = np.column_stack((n_tests,n_positives))
-    simulation_results = np.column_stack((n_tests,n_positives,n_new_infections[10:duration],n_true_negatives, n_false_positives))
+    simulation_results = np.column_stack((n_tests,n_positives,n_new_infections[start_day:duration],n_true_negatives, n_false_positives))
     headings = ['Tests', 'Positives', 'New Infections', 'True Negatives', 'False Positives']
     simulation_results = np.vstack([headings, simulation_results])
     
