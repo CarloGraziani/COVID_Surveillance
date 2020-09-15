@@ -222,7 +222,8 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
         if dn_r <= len(I):
             #R0 = sample(I, dn_r)
             #recov_time = np.random.exponential(scale= 1/nu, size = len(I))
-            R0 = [id for id in I if I_T[I.index(id)] >= peak_day]
+            #R0 = [id for id in I if I_T[I.index(id)] > peak_day]
+            R0 = [id for id in I if I_T[I.index(id)] > np.argmax(vload[sample(range(sample_size), 1)[0],:].numpy())]
             if dn_r <= len(R0):
                 R0 = sample(R0, dn_r)
             else:
@@ -300,7 +301,7 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
             #R0 = sample(I, dn_r)
             #recov_time = np.random.exponential(scale= 1/nu, size = len(I))
             #R0 = [id for id in I if int(time - I_T[I.index(id)]) >= recov_time[I.index(id)]]
-            R0 = [id for id in I if I_T[I.index(id)] >= peak_day]
+            R0 = [id for id in I if I_T[I.index(id)] > np.argmax(vload[sample(range(sample_size), 1)[0],:].numpy())]
             if dn_r <= len(R0):
                 R0 = sample(R0, dn_r)
             else:
