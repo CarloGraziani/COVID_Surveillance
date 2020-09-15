@@ -105,6 +105,8 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
     
     #symp_threshold = get_symptom_threshold(vload)
     sample_size = len(vload)
+    vmax_prob = testing_distribution(vload)
+    peak_day = np.argmax(vmax_prob)
     n_tests = []; n_positives = []; n_new_infections = [] ; n_true_negatives = []; n_false_positives = [];
 
     # Set population size and duration of the epidemic
@@ -220,7 +222,7 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
         if dn_r <= len(I):
             #R0 = sample(I, dn_r)
             #recov_time = np.random.exponential(scale= 1/nu, size = len(I))
-            R0 = [id for id in I if I_T[I.index(id)] >= 6]
+            R0 = [id for id in I if I_T[I.index(id)] >= peak_day]
             if dn_r <= len(R0):
                 R0 = sample(R0, dn_r)
             else:
@@ -298,7 +300,7 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
             #R0 = sample(I, dn_r)
             #recov_time = np.random.exponential(scale= 1/nu, size = len(I))
             #R0 = [id for id in I if int(time - I_T[I.index(id)]) >= recov_time[I.index(id)]]
-            R0 = [id for id in I if I_T[I.index(id)] >= 6]
+            R0 = [id for id in I if I_T[I.index(id)] >= peak_day]
             if dn_r <= len(R0):
                 R0 = sample(R0, dn_r)
             else:
