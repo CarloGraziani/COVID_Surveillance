@@ -336,7 +336,8 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
                     I_T_smp.append(I_T[id])
     
         # Choose healthy individuals who are symptomatic
-        S_R = S + R
+        # S_R = S + R
+        S_R = S
         smp_ibar = [id for id in S_R if int(np.random.binomial(size = 1, n = 1, p = prob_s_ibar))== 1]
     
         # All symptomatic individual
