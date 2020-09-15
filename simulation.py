@@ -17,7 +17,7 @@ from random import sample
 #######################################################################
 #######################################################################
 
-def sample_viral_load(mu_b = 5, sigma_b = 1, duration = 160):
+def sample_viral_load(mu_b = 12, sigma_b = 1, duration = 160):
     # Store 1000 viral load curves
     sample_size = 1000
     k = 1
@@ -85,13 +85,12 @@ def get_symptom_threshold(vload):
 
 def testing_distribution(vload):
     # Compute empirical distribution of viral load peak days
-    symp_threshold = get_symptom_threshold(vload)
+
     maxpos = []
     for id in range(len(vload)):
         v = vload[id,:].numpy()
-        if max(v) > symp_threshold:
-            pos = np.argmax(v)
-            maxpos.append(pos)
+        pos = np.argmax(v)
+        maxpos.append(pos)
     from collections import Counter
     v_dist = Counter(maxpos)
     vmax_prob = []
@@ -102,9 +101,9 @@ def testing_distribution(vload):
 
     
 
-def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, prob_s_i = 0.55, prob_s_ibar = 0.1, prob_fp = 0, v_threshold = 170306.4 * 1E-05):
+def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, prob_s_i = 0.6, prob_s_ibar = 0.05, prob_fp = 0, v_threshold = 170306.4 * 1E-05):
     
-    symp_threshold = get_symptom_threshold(vload)
+    #symp_threshold = get_symptom_threshold(vload)
     sample_size = len(vload)
     n_tests = []; n_positives = []; n_new_infections = [] ; n_true_negatives = []; n_false_positives = [];
 
@@ -219,7 +218,14 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
             S = []
     
         if dn_r <= len(I):
-            R0 = sample(I, dn_r)
+            #R0 = sample(I, dn_r)
+            #recov_time = np.random.exponential(scale= 1/nu, size = len(I))
+            R0 = [id for id in I if I_T[I.index(id)] >= 6]
+            if dn_r <= len(R0):
+                R0 = sample(R0, dn_r)
+            else:
+                R0 = R0
+                #break
             for id in R0:
                 ind = I.index(id)
                 del I_T[ind]
@@ -289,7 +295,15 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
             S = []
     
         if dn_r <= len(I):
-            R0 = sample(I, dn_r)
+            #R0 = sample(I, dn_r)
+            #recov_time = np.random.exponential(scale= 1/nu, size = len(I))
+            #R0 = [id for id in I if int(time - I_T[I.index(id)]) >= recov_time[I.index(id)]]
+            R0 = [id for id in I if I_T[I.index(id)] >= 6]
+            if dn_r <= len(R0):
+                R0 = sample(R0, dn_r)
+            else:
+                R0 = R0
+                break
             for id in R0:
                 ind = I.index(id)
                 del I_T[ind]
@@ -311,10 +325,12 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
         for id in range(len(I)):
             tau = int(time - I_T[id])
             random_id = sample(range(sample_size), 1)[0]
-            v_tau = vload[random_id, tau].numpy()
-            if v_tau > symp_threshold:
-                smp_i.append(I[id])
-                I_T_smp.append(I_T[id])
+            # v_tau = vload[random_id, tau].numpy()
+            v_max = np.argmax(vload[random_id, :].numpy())
+            if tau == v_max:
+                 if int(np.random.binomial(size = 1, n = 1, p = prob_s_i))== 1:
+                    smp_i.append(I[id])
+                    I_T_smp.append(I_T[id])
     
         # Choose healthy individuals who are symptomatic
         S_R = S + R
