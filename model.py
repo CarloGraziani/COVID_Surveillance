@@ -145,17 +145,19 @@ class loglik(object):
         self._epidemic(epipar)
         self._vdyn(vpar)
         ig_0, suscep = self._prob_integrals(pospar, sympar)
-        den = self.phi_s * (1.0 - suscep) + self.psi_s * (suscep)
+        den = ig_0 + self.psi_s * (suscep)
 #        p_given_si = ig1 / ig0
 #        i_given_s = ig0 /(ig0 + self.prob_s_ibar * (1-ig2))
 #        p_given_ibar_s = self.prob_fp
 #        ibar_given_s = 1.0 - i_given_s
 
 
-        p_given_s = ig_0 / (den * self.Vir_cadence) #p_given_si * i_given_s + p_given_ibar_s * ibar_given_s
+        p_given_s = ig_0 / den #p_given_si * i_given_s + p_given_ibar_s * ibar_given_s
         
     
         return p_given_s
+        
+    
 
 
 #######################################################################
@@ -289,8 +291,7 @@ class loglik(object):
         N_days = self.test_data[-1,0] - self.test_data[0,0] 
         N_days = tf.dtypes.cast(N_days, tf.int32)
         ir_current = ir[:,0,:]
-        integrand_0 = ir_current * self.vload
-        #
+        integrand_0 = ir_current * self.vload#
         integrand_0= tf.reshape(integrand_0 , [1,integrand_0.shape[0], integrand_0.shape[1]])
         
         suscep_t = suscep[0, :, 0]
@@ -308,7 +309,7 @@ class loglik(object):
             integrand_0 = tf.concat([integrand_0, integrand_0_new], axis = 0)
         
   
-        #print(self.vload)
+        
         
         
 
@@ -316,7 +317,7 @@ class loglik(object):
 
         ###Need to compute expectations
         
-        ig_0 = tf.reduce_sum(integrand_0, axis=-1) * self.Vir_cadence * self.phi_s
+        ig_0 = tf.reduce_sum(integrand_0, axis=-1)  * self.phi_s
         suscep_t = tf.reshape(suscep_t, [ig_0.shape[0], ig_0.shape[1]])
         
         
