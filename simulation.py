@@ -156,6 +156,7 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
     # Record time stamp of infection for each infected individual
 
     I_T = [0] * len(I)
+    I_index = [int(x) for x in sample(range(sample_size), len(I))]   
 
     # Record people who tested positive
 
@@ -188,6 +189,7 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
                 # print(ind, len(I_T), len(I))
                 del I_T[ind]
                 del I[ind]
+                del I_index[ind]
         
         r1 = math.floor(0.5 + mu * len(R))
         if r1 > 0:
@@ -215,6 +217,7 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
             S = [id for id in S if id not in I0]
             I = I + I0
             I_T = I_T + [time] * len(I0)
+            I_index = I_index + [int(x) for x in sample(range(sample_size), len(I0))]
         else:
             I = I + S
             S = []
@@ -223,7 +226,7 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
             #R0 = sample(I, dn_r)
             #recov_time = np.random.exponential(scale= 1/nu, size = len(I))
             #R0 = [id for id in I if I_T[I.index(id)] > peak_day]
-            R0 = [id for id in I if (time - I_T[I.index(id)]) > np.argmax(vload[sample(range(sample_size), 1)[0],:].numpy())]
+            R0 = [id for id in I if (time - I_T[I.index(id)]) > np.argmax(vload[I_index[I.index(id)],:].numpy())]
             if dn_r <= len(R0):
                 R0 = sample(R0, dn_r)
             else:
@@ -233,11 +236,13 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
                 ind = I.index(id)
                 del I_T[ind]
                 del I[ind]
+                del I_index[ind]
             R = R + R0
         else:
             R = R + I
             I = []
             I_T = []
+            I_index = []
             break
         time += 1
 
@@ -266,6 +271,7 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
                 ind = I.index(id)
                 del I_T[ind]
                 del I[ind]
+                del I_index[ind]
         
         r1 = math.floor(0.5 + mu * len(R))
         if r1 > 0:
@@ -293,6 +299,7 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
             S = [id for id in S if id not in I0]
             I = I + I0
             I_T = I_T + [time] * len(I0)
+            I_index = I_index + [int(x) for x in sample(range(sample_size), len(I0))]
         else:
             I = I + S
             S = []
@@ -301,7 +308,7 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
             #R0 = sample(I, dn_r)
             #recov_time = np.random.exponential(scale= 1/nu, size = len(I))
             #R0 = [id for id in I if int(time - I_T[I.index(id)]) >= recov_time[I.index(id)]]
-            R0 = [id for id in I if (time - I_T[I.index(id)]) > np.argmax(vload[sample(range(sample_size), 1)[0],:].numpy())]
+            R0 = [id for id in I if (time - I_T[I.index(id)]) > np.argmax(vload[I_index[I.index(id)],:].numpy())]
             if dn_r <= len(R0):
                 R0 = sample(R0, dn_r)
             else:
@@ -311,11 +318,13 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
                 ind = I.index(id)
                 del I_T[ind]
                 del I[ind]
+                del I_index[ind]
             R = R + R0
         else:
             R = R + I
             I = []
             I_T = []
+            I_index = []
             break
     
         # Choose infected individuals who are symptomatic
@@ -327,7 +336,7 @@ def simulate_epidemic(vload, start_day = 10, duration = 160, pop_size = 10000, p
               
         for id in range(len(I)):
             tau = int(time - I_T[id])
-            random_id = sample(range(sample_size), 1)[0]
+            random_id = I_index[id]
             # v_tau = vload[random_id, tau].numpy()
             v_max = np.argmax(vload[random_id, :].numpy())
             if tau == v_max:
