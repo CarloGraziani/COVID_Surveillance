@@ -60,7 +60,7 @@ class loglik(object):
 #######################################################################
     def __init__(self, test_data, vdyn_ode_fn, positive_fn, 
                  symptom_fn, prob_s_ibar, prob_fp=0.0, Epi_Model=None,
-                 duration=8.0, Epi_cadence=0.5, Vir_cadence=0.0625, phi_s = 0.6, psi_s = 0.05):
+                 duration=8.0, Epi_cadence=1.0, Vir_cadence=0.0625, phi_s = 0.6, psi_s = 0.05):
         """
         Constructor
         """
@@ -151,7 +151,8 @@ class loglik(object):
 #        p_given_ibar_s = self.prob_fp
 #        ibar_given_s = 1.0 - i_given_s
 
-
+        print(ig_0)
+        print(den)
         p_given_s = ig_0 / den #p_given_si * i_given_s + p_given_ibar_s * ibar_given_s
         
     
@@ -244,12 +245,13 @@ class loglik(object):
         results = DP.solve(vm.RHS, vdyn_initial_time, initial_state,
                            solution_times=self.vtimes)  #mng replaced vdyn_init by initial_states and self.initial_times
 
-        self.vload = results.states[...,0]  
+        self.vload = results.states[...,0]
         # But this has shape self.vtimes.shape[0] + vpar.shape[:-1].
         # We want vpar.shape[:-1] + self.vtimes.shape[0]
         r = len(self.vload.shape)
         p = (np.arange(r) + 1) % r
-        self.vload = sim.testing_distribution(tf.transpose(self.vload, perm=p))
+        self.vload = tf.transpose(self.vload, perm=p)
+        
 
 #######################################################################
     def _prob_integrals(self, pospar, sympar):
@@ -289,7 +291,8 @@ class loglik(object):
         N_days = self.test_data[-1,0] - self.test_data[0,0] 
         N_days = tf.dtypes.cast(N_days, tf.int32)
         ir_current = ir[:,0,:]
-        integrand_0 = ir_current * self.vload#
+        vload_peak = sim.testing_distribution(self.vload)
+        integrand_0 = ir_current * vload_peak#
         integrand_0= tf.reshape(integrand_0 , [1,integrand_0.shape[0], integrand_0.shape[1]])
         
         suscep_t = suscep[0, :, 0]
@@ -299,10 +302,12 @@ class loglik(object):
         
 
         for index_day in range(N_days):
-
+            vload_peak = sim.testing_distribution(self.vload)
+            print('printing vload shape')
+            print(vload_peak)
             ir_current = ir[:,index_day +1,:]
             
-            integrand_0_new = ir_current * self.vload
+            integrand_0_new = ir_current * vload_peak
             integrand_0_new = tf.reshape(integrand_0_new , [1,integrand_0_new.shape[0], integrand_0_new.shape[1]])
             integrand_0 = tf.concat([integrand_0, integrand_0_new], axis = 0)
         
